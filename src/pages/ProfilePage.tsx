@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuthContext } from '../context/AuthContext';
 import { updateUserProfile } from '../services/authService';
 import { uploadToCloudinary } from '../services/storageService';
-import { FiCamera, FiUser, FiPhone, FiMail, FiShield, FiSave, FiLoader } from 'react-icons/fi';
+import { PROVINCES } from '../config/site';
+import { FiCamera, FiUser, FiPhone, FiMail, FiShield, FiSave, FiLoader, FiTruck, FiMapPin } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import './ProfilePage.css';
 
@@ -11,6 +12,10 @@ export default function ProfilePage() {
   const [displayName, setDisplayName] = useState('');
   const [phone, setPhone] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
+  const [street, setStreet] = useState('');
+  const [city, setCity] = useState('');
+  const [province, setProvince] = useState('');
+  const [zipCode, setZipCode] = useState('');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -19,6 +24,12 @@ export default function ProfilePage() {
       setDisplayName(profile.displayName || firebaseUser?.displayName || '');
       setPhone(profile.phone || '');
       setAvatarUrl(profile.avatarUrl || firebaseUser?.photoURL || '');
+      if (profile.shippingAddress) {
+        setStreet(profile.shippingAddress.street || '');
+        setCity(profile.shippingAddress.city || '');
+        setProvince(profile.shippingAddress.province || '');
+        setZipCode(profile.shippingAddress.zipCode || '');
+      }
     } else if (firebaseUser) {
       setDisplayName(firebaseUser.displayName || '');
       setAvatarUrl(firebaseUser.photoURL || '');
@@ -38,7 +49,6 @@ export default function ProfilePage() {
       setUploadingAvatar(true);
       toast.loading('Subiendo foto de avatar...', { id: 'avatar-upload' });
       
-      // Subir avatar a Cloudinary en la carpeta products o avatars
       const url = await uploadToCloudinary(file, 'products');
       setAvatarUrl(url);
 
@@ -66,9 +76,15 @@ export default function ProfilePage() {
         displayName,
         phone,
         avatarUrl,
+        shippingAddress: {
+          street,
+          city,
+          province,
+          zipCode,
+        },
       });
       await refreshProfile();
-      toast.success('Perfil actualizado correctamente');
+      toast.success('Perfil y dirección de envío guardados correctamente');
     } catch (err: any) {
       console.error('Error actualizando perfil:', err);
       toast.error(err.message || 'Error al guardar los cambios');
@@ -109,10 +125,12 @@ export default function ProfilePage() {
         </div>
 
         <form onSubmit={handleSubmit} className="profile-form">
+          <h3 className="profile-section-title">
+            <FiUser /> Información Personal
+          </h3>
+
           <div className="form-group">
-            <label className="form-label">
-              <FiUser /> Nombre completo
-            </label>
+            <label className="form-label">Nombre completo</label>
             <input
               className="form-input"
               type="text"
@@ -152,11 +170,73 @@ export default function ProfilePage() {
             />
           </div>
 
+          <hr className="profile-divider" />
+
+          <h3 className="profile-section-title">
+            <FiTruck /> Dirección de Envío Principal
+          </h3>
+          <p className="profile-section-desc">
+            Esta información se usará automáticamente en tus futuras compras.
+          </p>
+
+          <div className="form-group">
+            <label className="form-label">
+              <FiMapPin /> Calle y número (Piso / Dpto)
+            </label>
+            <input
+              className="form-input"
+              type="text"
+              value={street}
+              onChange={(e) => setStreet(e.target.value)}
+              placeholder="Ej: Av. Corrientes 1234 4to B"
+            />
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="form-group">
+              <label className="form-label">Localidad / Ciudad</label>
+              <input
+                className="form-input"
+                type="text"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                placeholder="Ej: La Plata"
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Código Postal (CP)</label>
+              <input
+                className="form-input"
+                type="text"
+                value={zipCode}
+                onChange={(e) => setZipCode(e.target.value)}
+                placeholder="Ej: 1900"
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Provincia</label>
+            <select
+              className="form-select"
+              value={province}
+              onChange={(e) => setProvince(e.target.value)}
+            >
+              <option value="">Selecciona tu provincia</option>
+              {PROVINCES.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <button
             type="submit"
             className="btn btn--primary"
             disabled={saving || uploadingAvatar}
-            style={{ marginTop: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+            style={{ marginTop: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
           >
             {saving ? <FiLoader className="spinner" /> : <FiSave />}
             {saving ? 'Guardando...' : 'Guardar Cambios'}

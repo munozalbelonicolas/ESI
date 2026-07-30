@@ -108,3 +108,26 @@
   margin-top: 4px;
   text-align: center;
 }
+
+.profile-section-title {
+  font-size: var(--text-lg);
+  font-family: var(--font-heading);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-primary);
+  margin-top: var(--space-sm);
+  margin-bottom: var(--space-xs);
+}
+
+.profile-section-desc {
+  font-size: var(--text-xs);
+  color: var(--color-text-light);
+  margin-bottom: var(--space-md);
+}
+
+.profile-divider {
+  border: none;
+  border-top: 1px dashed var(--color-border-light, #e5e7eb);
+  margin: var(--space-md) 0;
+}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useCartContext } from '../context/CartContext';
 import { useAuthContext } from '../context/AuthContext';
@@ -33,6 +33,17 @@ export default function CheckoutPage() {
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const [transferFile, setTransferFile] = useState<File | null>(null);
   const [processing, setProcessing] = useState(false);
+
+  useEffect(() => {
+    if (profile?.shippingAddress) {
+      setAddress({
+        street: profile.shippingAddress.street || '',
+        city: profile.shippingAddress.city || '',
+        province: profile.shippingAddress.province || '',
+        zipCode: profile.shippingAddress.zipCode || '',
+      });
+    }
+  }, [profile]);
 
   const hasDigitalOnly = items.every((i) => i.product.isDigital);
   const subtotal = getSubtotal();

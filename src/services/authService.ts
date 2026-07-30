@@ -10,6 +10,7 @@ import {
 import { doc, setDoc, getDoc, updateDoc, Timestamp } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import type { AppUser } from '../types/user';
+import type { ShippingAddress } from '../types/order';
 
 /**
  * Registra un nuevo usuario con email y contraseña.
@@ -80,7 +81,12 @@ export async function getUserProfile(uid: string): Promise<AppUser | null> {
  */
 export async function updateUserProfile(
   uid: string,
-  data: { displayName?: string; phone?: string; avatarUrl?: string }
+  data: {
+    displayName?: string;
+    phone?: string;
+    avatarUrl?: string;
+    shippingAddress?: ShippingAddress;
+  }
 ): Promise<void> {
   const userRef = doc(db, 'users', uid);
   await updateDoc(userRef, {
