@@ -9,6 +9,7 @@ import type { Product } from '../types/product';
 import type { BlogPost } from '../types/blog';
 import { formatDate } from '../utils/formatDate';
 import { FiArrowRight, FiBookOpen, FiHeart, FiUsers, FiAward } from 'react-icons/fi';
+import crisImage from '../assets/cris.svg';
 import './HomePage.css';
 
 export default function HomePage() {
@@ -154,30 +155,29 @@ export default function HomePage() {
           <div className="about__grid">
             <div className="about__content">
               <span className="hero__eyebrow">Sobre nosotros</span>
-              <h2>¿Quiénes somos?</h2>
+              <h2>¿Quién soy?</h2>
               <p>
-                <strong>ESI en Secundaria</strong> nació del compromiso de un equipo docente convencido
-                de que la Educación Sexual Integral es un derecho de las y los estudiantes,
-                y una herramienta fundamental para construir vínculos más sanos, respetuosos
-                y libres de violencia.
+                <strong>Soy Cristina Bronzatti</strong>, profesora de Lengua y Literatura, Licenciada en Educación y "Especialista en Educación Sexual Integral" (INFoD y UBA). Trabajo en los niveles secundario y superior.
               </p>
               <p>
-                Sabemos que muchas veces la ESI puede generar dudas o inseguridades a la hora de
-                llevarla al aula. Por eso creamos materiales prácticos, claros y actualizados que
-                te permiten abordar cada eje de la ESI con confianza y profesionalismo.
+                Esta cuenta nació un 3 de junio, en el marco de "Ni Una Menos", cuando no pudimos salir a marchar y la militancia encontró en las redes un espacio posible. ✊🏼
               </p>
               <p>
-                Desde cuadernillos temáticos hasta juegos interactivos, cada recurso está pensado
-                para acompañarte en tu tarea diaria. Porque cuando las y los docentes se sienten
-                preparados, las y los estudiantes aprenden mejor.
+                Desde entonces comparto materiales, reflexiones y propuestas para enseñar ESI desde un enfoque de derechos, con perspectiva pedagógica y profundamente anclada en la práctica cotidiana de las escuelas.
+              </p>
+              <p>
+                Acá vas a encontrar recursos gratuitos, secuencias didácticas, juegos, debates, cursos y materiales pensados para quienes creen que la ESI también se construye enseñando.
+              </p>
+              <p>
+                Si sos docente, estudiante de formación docente o la ESI forma parte de tu práctica educativa, este espacio es para vos. 💜
               </p>
               <div className="about__stats">
                 <div className="about__stat">
-                  <span className="about__stat-number">+500</span>
+                  <span className="about__stat-number">+2500</span>
                   <span className="about__stat-label">Docentes confían en nuestros recursos</span>
                 </div>
                 <div className="about__stat">
-                  <span className="about__stat-number">+30</span>
+                  <span className="about__stat-number">+60</span>
                   <span className="about__stat-label">Materiales disponibles</span>
                 </div>
                 <div className="about__stat">
@@ -188,7 +188,9 @@ export default function HomePage() {
             </div>
             <div className="about__visual">
               <div className="about__image-wrapper">
-                <img src={SITE_CONFIG.logo} alt="ESI en Secundaria" className="about__logo" />
+                <div className="about__portrait-frame">
+                  <img src={crisImage} alt="Cristina Bronzatti — ESI en Secundaria" className="about__portrait-img" />
+                </div>
               </div>
             </div>
           </div>
