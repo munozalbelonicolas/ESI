@@ -5,6 +5,7 @@ import { useAuthContext } from '../context/AuthContext';
 import { createOrder } from '../services/orderService';
 import { validateCoupon, calculateDiscount, incrementCouponUsage } from '../services/couponService';
 import { getShippingQuotes, type ShippingQuote } from '../services/shippingService';
+import { getBankDetails, type BankDetails } from '../services/bankService';
 import { uploadTransferProof } from '../services/storageService';
 import { saveTransferProof } from '../services/orderService';
 import { createMPPreference } from '../services/paymentService';
@@ -14,7 +15,7 @@ import { onPurchaseComplete } from '../services/subscriptionHook';
 import { PROVINCES } from '../config/site';
 import type { PaymentMethod, ShippingAddress } from '../types/order';
 import type { Coupon } from '../types/coupon';
-import { FiTruck, FiCreditCard, FiUpload, FiCheck, FiTag } from 'react-icons/fi';
+import { FiTruck, FiCreditCard, FiUpload, FiCheck, FiTag, FiCopy, FiInfo } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import './CheckoutPage.css';
 
@@ -29,10 +30,16 @@ export default function CheckoutPage() {
   const [selectedShipping, setSelectedShipping] = useState<ShippingQuote | null>(null);
   const [loadingShipping, setLoadingShipping] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('mercadopago');
+  const [bankDetails, setBankDetails] = useState<BankDetails | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const [transferFile, setTransferFile] = useState<File | null>(null);
   const [processing, setProcessing] = useState(false);
+
+  useEffect(() => {
+    getBankDetails().then(setBankDetails);
+  }, []);
 
   useEffect(() => {
     if (profile?.shippingAddress) {
@@ -239,10 +246,90 @@ export default function CheckoutPage() {
                 </div>
 
                 {paymentMethod === 'transfer' && (
-                  <div className="transfer-upload">
-                    <label className="form-label"><FiUpload /> Subir comprobante</label>
-                    <input type="file" accept="image/*,.pdf" onChange={e => setTransferFile(e.target.files?.[0] || null)} className="form-input" />
-                    {transferFile && <p className="transfer-filename">{transferFile.name}</p>}
+                  <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {bankDetails && (
+                      <div style={{ background: 'var(--color-bg-alt)', padding: 16, borderRadius: 12, border: '1px solid var(--color-border)' }}>
+                        <h4 style={{ margin: '0 0 12px 0', fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', gap: 8, color: 'var(--color-text)' }}>
+                          <FiCreditCard size={18} style={{ color: 'var(--color-primary)' }} /> Datos para realizar la transferencia
+                        </h4>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 'var(--text-xs)' }}>
+                          <div>
+                            <span style={{ color: 'var(--color-text-muted)' }}>Banco / Entidad: </span>
+                            <strong style={{ color: 'var(--color-text)' }}>{bankDetails.bankName}</strong>
+                          </div>
+                          <div>
+                            <span style={{ color: 'var(--color-text-muted)' }}>Titular: </span>
+                            <strong style={{ color: 'var(--color-text)' }}>{bankDetails.accountHolder}</strong>
+                          </div>
+                          {bankDetails.cuit && (
+                            <div>
+                              <span style={{ color: 'var(--color-text-muted)' }}>CUIT / CUIL: </span>
+                              <span style={{ fontFamily: 'var(--font-mono)' }}>{bankDetails.cuit}</span>
+                            </div>
+                          )}
+
+                          <div style={{ background: 'var(--color-bg)', padding: 10, borderRadius: 8, marginTop: 4, border: '1px solid var(--color-border)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                              <div>
+                                <span style={{ color: 'var(--color-text-muted)', display: 'block', fontSize: '10px' }}>CBU / CVU:</span>
+                                <strong style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', wordBreak: 'break-all' }}>{bankDetails.cbu}</strong>
+                              </div>
+                              <button
+                                type="button"
+                                className="btn btn--outline btn--sm"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(bankDetails.cbu);
+                                  setCopiedField('CBU');
+                                  toast.success('CBU copiado al portapapeles');
+                                  setTimeout(() => setCopiedField(null), 2000);
+                                }}
+                                style={{ flexShrink: 0, padding: '4px 8px', fontSize: '11px' }}
+                              >
+                                {copiedField === 'CBU' ? <FiCheck color="green" /> : <FiCopy />} Copiar
+                              </button>
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--color-border)', paddingTop: 6 }}>
+                              <div>
+                                <span style={{ color: 'var(--color-text-muted)', display: 'block', fontSize: '10px' }}>ALIAS:</span>
+                                <strong style={{ color: 'var(--color-primary)', fontSize: 'var(--text-xs)' }}>{bankDetails.alias}</strong>
+                              </div>
+                              <button
+                                type="button"
+                                className="btn btn--outline btn--sm"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(bankDetails.alias);
+                                  setCopiedField('Alias');
+                                  toast.success('Alias copiado al portapapeles');
+                                  setTimeout(() => setCopiedField(null), 2000);
+                                }}
+                                style={{ flexShrink: 0, padding: '4px 8px', fontSize: '11px' }}
+                              >
+                                {copiedField === 'Alias' ? <FiCheck color="green" /> : <FiCopy />} Copiar
+                              </button>
+                            </div>
+                          </div>
+
+                          {bankDetails.notes && (
+                            <div style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontStyle: 'italic', marginTop: 4 }}>
+                              💡 {bankDetails.notes}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="transfer-upload" style={{ background: 'var(--color-bg-alt)', padding: 16, borderRadius: 12, border: '1px dashed var(--color-border)' }}>
+                      <label className="form-label" style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                        <FiUpload style={{ color: 'var(--color-primary)' }} /> Cargar Comprobante de Transferencia (Imagen o PDF)
+                      </label>
+                      <input type="file" accept="image/*,.pdf" onChange={e => setTransferFile(e.target.files?.[0] || null)} className="form-input" />
+                      {transferFile && (
+                        <p className="transfer-filename" style={{ color: 'var(--color-success)', fontWeight: 600, marginTop: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <FiCheck /> Comprobante seleccionado: {transferFile.name}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 )}
 

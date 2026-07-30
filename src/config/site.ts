@@ -32,6 +32,7 @@ export const ADMIN_NAV_LINKS = [
   { label: 'Órdenes', path: '/admin/ordenes', icon: 'orders' },
   { label: 'Cupones', path: '/admin/cupones', icon: 'coupons' },
   { label: 'Envíos', path: '/admin/envios', icon: 'shipping' },
+  { label: 'Datos Bancarios', path: '/admin/banco', icon: 'bank' },
 ] as const;
 
 export const PROVINCES = [

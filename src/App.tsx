@@ -29,6 +29,7 @@ import AdminBlogPage from './pages/admin/AdminBlogPage';
 import AdminOrdersPage from './pages/admin/AdminOrdersPage';
 import AdminCouponsPage from './pages/admin/AdminCouponsPage';
 import AdminShippingPage from './pages/admin/AdminShippingPage';
+import AdminBankPage from './pages/admin/AdminBankPage';
 
 function PublicLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -94,6 +95,7 @@ export default function App() {
               <Route path="ordenes" element={<AdminOrdersPage />} />
               <Route path="cupones" element={<AdminCouponsPage />} />
               <Route path="envios" element={<AdminShippingPage />} />
+              <Route path="banco" element={<AdminBankPage />} />
             </Route>
 
             {/* 404 */}
