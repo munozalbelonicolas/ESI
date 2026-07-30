@@ -46,6 +46,11 @@ export default function CheckoutPage() {
   }, [profile]);
 
   const hasDigitalOnly = items.every((i) => i.product.isDigital);
+  const totalWeightGrams = items.reduce((acc, i) => {
+    if (i.product.isDigital) return acc;
+    return acc + (i.product.weightGrams || 500) * i.quantity;
+  }, 0);
+
   const subtotal = getSubtotal();
   const discount = appliedCoupon ? calculateDiscount(appliedCoupon, subtotal) : 0;
   const shippingCost = hasDigitalOnly ? 0 : (selectedShipping?.price || 0);
@@ -58,10 +63,10 @@ export default function CheckoutPage() {
     if (address.zipCode.length !== 4) { toast.error('Ingresá un código postal válido (4 dígitos)'); return; }
     setLoadingShipping(true);
     try {
-      const quotes = await getShippingQuotes(address.zipCode);
+      const quotes = await getShippingQuotes(address.zipCode, totalWeightGrams);
       setShippingQuotes(quotes);
       if (quotes.length > 0) setSelectedShipping(quotes[0]);
-    } catch { toast.error('Error al calcular envío'); }
+    } catch { toast.error('Error al calcular envío por Correo Argentino'); }
     setLoadingShipping(false);
   };
 

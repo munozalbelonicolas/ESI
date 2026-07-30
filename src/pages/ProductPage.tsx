@@ -4,9 +4,11 @@ import { getProductBySlug } from '../services/productService';
 import { useCartContext } from '../context/CartContext';
 import { formatPrice, calcDiscount } from '../utils/formatPrice';
 import { getOptimizedImageUrl } from '../utils/imageUtils';
+import { getShippingQuotes, isValidShippingZipCode, type ShippingQuote } from '../services/shippingService';
 import { trackViewItem, trackAddToCart } from '../config/analytics';
 import type { Product } from '../types/product';
-import { FiShoppingBag, FiArrowLeft, FiMinus, FiPlus, FiDownload } from 'react-icons/fi';
+import { FiShoppingBag, FiArrowLeft, FiMinus, FiPlus, FiDownload, FiTruck, FiSearch } from 'react-icons/fi';
+import toast from 'react-hot-toast';
 import './ProductPage.css';
 
 export default function ProductPage() {
@@ -15,6 +17,9 @@ export default function ProductPage() {
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [selectedImage, setSelectedImage] = useState(0);
+  const [calcZip, setCalcZip] = useState('');
+  const [quotes, setQuotes] = useState<ShippingQuote[]>([]);
+  const [calcLoading, setCalcLoading] = useState(false);
   const { addItem, isInCart } = useCartContext();
 
   useEffect(() => {
@@ -45,6 +50,24 @@ export default function ProductPage() {
     if (isOutOfStock) return;
     addItem(product, quantity);
     trackAddToCart(product.id, product.name, product.price, quantity);
+  };
+
+  const handleCalculateShipping = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isValidShippingZipCode(calcZip)) {
+      toast.error('Ingresá un código postal válido (4 dígitos)');
+      return;
+    }
+    setCalcLoading(true);
+    try {
+      const weight = (product.weightGrams || 500) * quantity;
+      const res = await getShippingQuotes(calcZip, weight, product.customShippingPrice);
+      setQuotes(res);
+    } catch {
+      toast.error('Error al cotizar envío');
+    } finally {
+      setCalcLoading(false);
+    }
   };
 
   return (
@@ -131,6 +154,45 @@ export default function ProductPage() {
                 )}
               </button>
             </div>
+
+            {!product.isDigital && (
+              <div className="product-page__shipping-calc" style={{ marginTop: 24, padding: 16, background: 'var(--color-bg-alt)', borderRadius: 12, border: '1px solid var(--color-border)' }}>
+                <h4 style={{ margin: '0 0 8px 0', fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', gap: 8, color: 'var(--color-text)' }}>
+                  <FiTruck size={18} style={{ color: 'var(--color-primary)' }} /> Calcular envío por Correo Argentino
+                </h4>
+                <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 12 }}>
+                  Ingresá tu código postal para conocer las opciones y costos de entrega.
+                </p>
+                <form onSubmit={handleCalculateShipping} style={{ display: 'flex', gap: 8 }}>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Ej: 1425"
+                    maxLength={4}
+                    value={calcZip}
+                    onChange={(e) => setCalcZip(e.target.value.replace(/\D/g, ''))}
+                    style={{ width: 120 }}
+                  />
+                  <button type="submit" className="btn btn--outline btn--sm" disabled={calcLoading || calcZip.length !== 4}>
+                    {calcLoading ? 'Calculando...' : 'Calcular'}
+                  </button>
+                </form>
+
+                {quotes.length > 0 && (
+                  <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {quotes.map((q) => (
+                      <div key={q.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'var(--color-bg)', borderRadius: 8, fontSize: 'var(--text-xs)', border: '1px solid var(--color-border)' }}>
+                        <div>
+                          <strong style={{ display: 'block', color: 'var(--color-text)' }}>{q.name}</strong>
+                          <span style={{ color: 'var(--color-text-muted)' }}>Llega en {q.estimatedDays}</span>
+                        </div>
+                        <span style={{ fontWeight: 700, color: 'var(--color-primary)', fontSize: 'var(--text-sm)' }}>{formatPrice(q.price)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Description */}
             <div className="product-page__description">

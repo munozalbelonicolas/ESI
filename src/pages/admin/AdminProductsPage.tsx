@@ -16,7 +16,7 @@ export default function AdminProductsPage() {
   const [form, setForm] = useState<ProductFormData>({
     name: '', description: '', shortDescription: '', price: 0, compareAtPrice: null,
     isFree: false, category: PRODUCT_CATEGORIES[0], images: [], stock: -1,
-    isDigital: true, digitalFileUrl: null, isActive: true, tags: [],
+    isDigital: true, digitalFileUrl: null, weightGrams: 500, customShippingPrice: null, isActive: true, tags: [],
   });
 
   const loadProducts = async () => {
@@ -28,13 +28,19 @@ export default function AdminProductsPage() {
   useEffect(() => { loadProducts(); }, []);
 
   const resetForm = () => {
-    setForm({ name: '', description: '', shortDescription: '', price: 0, compareAtPrice: null, isFree: false, category: PRODUCT_CATEGORIES[0], images: [], stock: -1, isDigital: true, digitalFileUrl: null, isActive: true, tags: [] });
+    setForm({ name: '', description: '', shortDescription: '', price: 0, compareAtPrice: null, isFree: false, category: PRODUCT_CATEGORIES[0], images: [], stock: -1, isDigital: true, digitalFileUrl: null, weightGrams: 500, customShippingPrice: null, isActive: true, tags: [] });
     setEditingId(null);
     setShowForm(false);
   };
 
   const handleEdit = (p: Product) => {
-    setForm({ name: p.name, description: p.description, shortDescription: p.shortDescription, price: p.price, compareAtPrice: p.compareAtPrice, isFree: p.isFree, category: p.category, images: p.images, stock: p.stock, isDigital: p.isDigital, digitalFileUrl: p.digitalFileUrl, isActive: p.isActive, tags: p.tags });
+    setForm({
+      name: p.name, description: p.description, shortDescription: p.shortDescription,
+      price: p.price, compareAtPrice: p.compareAtPrice, isFree: p.isFree, category: p.category,
+      images: p.images, stock: p.stock, isDigital: p.isDigital, digitalFileUrl: p.digitalFileUrl,
+      weightGrams: p.weightGrams ?? 500, customShippingPrice: p.customShippingPrice ?? null,
+      isActive: p.isActive, tags: p.tags
+    });
     setEditingId(p.id);
     setShowForm(true);
   };
@@ -197,6 +203,44 @@ export default function AdminProductsPage() {
                 <input type="checkbox" checked={form.isActive} onChange={e => update('isActive', e.target.checked)} /> Activo
               </label>
             </div>
+
+            {!form.isDigital && (
+              <div style={{ background: 'var(--color-bg-alt)', padding: 16, borderRadius: 8, marginBottom: 16, border: '1px solid var(--color-border)' }}>
+                <h4 style={{ margin: '0 0 12px 0', fontSize: 'var(--text-sm)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  📦 Configuración de Envío Correo Argentino (Producto Físico)
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Peso unitario (gramos)</label>
+                    <input
+                      className="form-input"
+                      type="number"
+                      value={form.weightGrams ?? 500}
+                      onChange={e => update('weightGrams', Number(e.target.value))}
+                      min={10}
+                      placeholder="Ej: 350"
+                    />
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                      Peso de 1 unidad (ej: 350g). El sistema acumula los gramos en el carrito.
+                    </span>
+                  </div>
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label className="form-label">Tarifa fija de envío opcional ($)</label>
+                    <input
+                      className="form-input"
+                      type="number"
+                      value={form.customShippingPrice || ''}
+                      onChange={e => update('customShippingPrice', e.target.value ? Number(e.target.value) : null)}
+                      min={0}
+                      placeholder="Dejar vacío para cálculo automático"
+                    />
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>
+                      Si completás este valor, se usará tarifa fija en lugar del cálculo por CP.
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="admin-form__actions">
               <button type="submit" className="btn btn--primary" disabled={uploadingImages}>{editingId ? 'Guardar cambios' : 'Crear producto'}</button>
               <button type="button" className="btn btn--ghost" onClick={resetForm}>Cancelar</button>

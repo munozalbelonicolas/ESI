@@ -14,6 +14,8 @@ export interface Product {
   stock: number; // -1 = digital/ilimitado
   isDigital: boolean;
   digitalFileUrl: string | null;
+  weightGrams?: number;
+  customShippingPrice?: number | null;
   isActive: boolean;
   tags: string[];
   createdAt: Timestamp;
@@ -32,6 +34,8 @@ export interface ProductFormData {
   stock: number;
   isDigital: boolean;
   digitalFileUrl: string | null;
+  weightGrams?: number;
+  customShippingPrice?: number | null;
   isActive: boolean;
   tags: string[];
 }
