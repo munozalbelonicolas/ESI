@@ -4,9 +4,10 @@ import {
   signOut,
   sendEmailVerification,
   sendPasswordResetEmail,
+  updateProfile,
   User,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, Timestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, Timestamp } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 import type { AppUser } from '../types/user';
 
@@ -72,6 +73,27 @@ export async function getUserProfile(uid: string): Promise<AppUser | null> {
   const snap = await getDoc(doc(db, 'users', uid));
   if (!snap.exists()) return null;
   return { id: snap.id, ...snap.data() } as AppUser;
+}
+
+/**
+ * Actualiza el perfil del usuario en Firestore y en Firebase Auth.
+ */
+export async function updateUserProfile(
+  uid: string,
+  data: { displayName?: string; phone?: string; avatarUrl?: string }
+): Promise<void> {
+  const userRef = doc(db, 'users', uid);
+  await updateDoc(userRef, {
+    ...data,
+    updatedAt: Timestamp.now(),
+  });
+
+  if (auth.currentUser) {
+    await updateProfile(auth.currentUser, {
+      displayName: data.displayName ?? auth.currentUser.displayName,
+      photoURL: data.avatarUrl ?? auth.currentUser.photoURL,
+    });
+  }
 }
 
 /**

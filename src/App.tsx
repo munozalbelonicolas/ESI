@@ -20,6 +20,7 @@ import BlogPostPage from './pages/BlogPostPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import MyOrdersPage from './pages/MyOrdersPage';
+import ProfilePage from './pages/ProfilePage';
 
 // Admin Pages
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
@@ -75,10 +76,7 @@ export default function App() {
             <Route path="/perfil" element={
               <PublicLayout>
                 <ProtectedRoute>
-                  <div className="section container" style={{ textAlign: 'center' }}>
-                    <h2>Mi perfil</h2>
-                    <p style={{ color: 'var(--color-text-light)' }}>Próximamente podrás editar tu perfil desde acá.</p>
-                  </div>
+                  <ProfilePage />
                 </ProtectedRoute>
               </PublicLayout>
             } />

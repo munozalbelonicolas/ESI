@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
 import { getAllProducts, createProduct, updateProduct, deleteProduct } from '../../services/productService';
+import { uploadProductImage } from '../../services/storageService';
 import { formatPrice } from '../../utils/formatPrice';
 import type { Product, ProductFormData } from '../../types/product';
 import { PRODUCT_CATEGORIES } from '../../types/product';
-import { FiPlus, FiEdit2, FiTrash2, FiX } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2, FiX, FiUploadCloud, FiLoader } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [uploadingImages, setUploadingImages] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<ProductFormData>({
@@ -35,6 +37,43 @@ export default function AdminProductsPage() {
     setForm({ name: p.name, description: p.description, shortDescription: p.shortDescription, price: p.price, compareAtPrice: p.compareAtPrice, isFree: p.isFree, category: p.category, images: p.images, stock: p.stock, isDigital: p.isDigital, digitalFileUrl: p.digitalFileUrl, isActive: p.isActive, tags: p.tags });
     setEditingId(p.id);
     setShowForm(true);
+  };
+
+  const handleImagesUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const invalidFiles = files.filter(f => !f.type.startsWith('image/'));
+    if (invalidFiles.length > 0) {
+      toast.error('Todos los archivos deben ser imágenes válidas');
+      return;
+    }
+
+    try {
+      setUploadingImages(true);
+      toast.loading(`Subiendo ${files.length} imagen(es)...`, { id: 'prod-img-upload' });
+
+      const uploadedUrls: string[] = [];
+      for (const file of files) {
+        const url = await uploadProductImage(file, 'products');
+        uploadedUrls.push(url);
+      }
+
+      setForm(prev => ({ ...prev, images: [...prev.images, ...uploadedUrls] }));
+      toast.success('Imágenes subidas a Cloudinary', { id: 'prod-img-upload' });
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Error al subir imágenes', { id: 'prod-img-upload' });
+    } finally {
+      setUploadingImages(false);
+    }
+  };
+
+  const handleRemoveImage = (indexToRemove: number) => {
+    setForm(prev => ({
+      ...prev,
+      images: prev.images.filter((_, idx) => idx !== indexToRemove)
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -115,8 +154,36 @@ export default function AdminProductsPage() {
                 </select>
               </div>
               <div className="form-group">
-                <label className="form-label">URLs de imágenes (una por línea)</label>
-                <textarea className="form-textarea" value={form.images.join('\n')} onChange={e => update('images', e.target.value.split('\n').filter(Boolean))} rows={3} placeholder="https://..." />
+                <label className="form-label">Imágenes del Producto</label>
+                <label
+                  className="btn btn--ghost"
+                  style={{ border: '2px dashed var(--color-border)', width: '100%', justifyContent: 'center', cursor: 'pointer', padding: '16px', marginBottom: 12 }}
+                >
+                  {uploadingImages ? <FiLoader className="spinner" /> : <FiUploadCloud style={{ marginRight: 8 }} />}
+                  {uploadingImages ? 'Subiendo imágenes...' : 'Subir una o varias imágenes'}
+                  <input type="file" accept="image/*" multiple onChange={handleImagesUpload} style={{ display: 'none' }} disabled={uploadingImages} />
+                </label>
+
+                {form.images.length > 0 && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 8 }}>
+                    {form.images.map((imgUrl, idx) => (
+                      <div key={idx} style={{ position: 'relative', width: '100%', paddingTop: '100%', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--color-border)' }}>
+                        <img src={imgUrl} alt={`Prod ${idx}`} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveImage(idx)}
+                          style={{
+                            position: 'absolute', top: 2, right: 2, background: 'rgba(0,0,0,0.7)', color: 'white',
+                            border: 'none', borderRadius: '50%', width: 22, height: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                          }}
+                          title="Eliminar imagen"
+                        >
+                          <FiX size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
             <div style={{ display: 'flex', gap: 24, marginBottom: 16 }}>
@@ -131,7 +198,7 @@ export default function AdminProductsPage() {
               </label>
             </div>
             <div className="admin-form__actions">
-              <button type="submit" className="btn btn--primary">{editingId ? 'Guardar cambios' : 'Crear producto'}</button>
+              <button type="submit" className="btn btn--primary" disabled={uploadingImages}>{editingId ? 'Guardar cambios' : 'Crear producto'}</button>
               <button type="button" className="btn btn--ghost" onClick={resetForm}>Cancelar</button>
             </div>
           </form>

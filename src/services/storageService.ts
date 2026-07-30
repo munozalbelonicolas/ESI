@@ -7,6 +7,23 @@
 
 const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+const API_KEY = import.meta.env.VITE_CLOUDINARY_API_KEY;
+const API_SECRET = import.meta.env.VITE_CLOUDINARY_API_SECRET;
+
+/**
+ * Genera la firma SHA-1 necesaria para los uploads en modo Signed de Cloudinary.
+ */
+async function generateSignature(params: Record<string, string>, apiSecret: string): Promise<string> {
+  const sortedKeys = Object.keys(params).sort();
+  const serialized = sortedKeys.map((key) => `${key}=${params[key]}`).join('&');
+  const stringToSign = `${serialized}${apiSecret}`;
+
+  const encoder = new TextEncoder();
+  const data = encoder.encode(stringToSign);
+  const hashBuffer = await crypto.subtle.digest('SHA-1', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+}
 
 /**
  * Convierte un archivo a Data URL Base64 para fallback local.
@@ -21,7 +38,7 @@ function fileToBase64(file: File): Promise<string> {
 }
 
 /**
- * Sube una imagen a Cloudinary (o fallback a Base64 si no hay credenciales).
+ * Sube una imagen a Cloudinary (Soporta modo Signed y Unsigned, o fallback a Base64).
  */
 export async function uploadToCloudinary(
   file: File,
@@ -35,10 +52,33 @@ export async function uploadToCloudinary(
     return fileToBase64(file);
   }
 
+  const targetFolder = `esi_secundaria/${folder}`;
   const formData = new FormData();
   formData.append('file', file);
   formData.append('upload_preset', UPLOAD_PRESET);
-  formData.append('folder', `esi_secundaria/${folder}`);
+  formData.append('folder', targetFolder);
+
+  // Si están configuradas las credenciales de API Key y API Secret (Modo Signed)
+  if (
+    API_KEY &&
+    API_SECRET &&
+    API_KEY !== 'your_api_key' &&
+    API_SECRET !== 'your_api_secret'
+  ) {
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const signature = await generateSignature(
+      {
+        folder: targetFolder,
+        timestamp,
+        upload_preset: UPLOAD_PRESET,
+      },
+      API_SECRET
+    );
+
+    formData.append('api_key', API_KEY);
+    formData.append('timestamp', timestamp);
+    formData.append('signature', signature);
+  }
 
   const res = await fetch(
     `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,

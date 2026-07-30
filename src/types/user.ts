@@ -7,6 +7,7 @@ export interface AppUser {
   email: string;
   displayName: string;
   phone: string;
+  avatarUrl?: string;
   role: UserRole;
   emailVerified: boolean;
   createdAt: Timestamp;
