@@ -1,0 +1,76 @@
+.shop-page__header {
+  margin-bottom: var(--space-xl);
+}
+
+.shop-page__header h1 {
+  margin-bottom: var(--space-xs);
+}
+
+.shop-page__header p {
+  color: var(--color-text-light);
+  font-size: var(--text-lg);
+}
+
+.shop-page__filters {
+  margin-bottom: var(--space-xl);
+  padding: var(--space-md);
+  background: var(--color-bg-alt);
+  border-radius: var(--radius-md);
+}
+
+.shop-page__filters-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-sm);
+  color: var(--color-text-light);
+}
+
+.shop-page__filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.filter-chip {
+  padding: 8px 16px;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-full);
+  font-family: var(--font-heading);
+  font-weight: 500;
+  font-size: var(--text-sm);
+  background: var(--color-white);
+  color: var(--color-text);
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filter-chip:hover {
+  border-color: var(--color-secondary);
+  color: var(--color-secondary);
+}
+
+.filter-chip--active {
+  background: var(--color-secondary);
+  color: white;
+  border-color: var(--color-secondary);
+}
+
+.shop-page__empty {
+  text-align: center;
+  padding: var(--space-3xl);
+}
+
+.shop-page__empty h3 {
+  margin-bottom: var(--space-sm);
+}
+
+.shop-page__empty p {
+  color: var(--color-text-light);
+  margin-bottom: var(--space-lg);
+}

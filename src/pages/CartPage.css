@@ -1,0 +1,47 @@
+.cart-page h1 { margin-bottom: var(--space-xl); }
+.cart-page__grid {
+  display: grid; grid-template-columns: 1fr 360px; gap: var(--space-xl); align-items: start;
+}
+.cart-page__items { display: flex; flex-direction: column; gap: var(--space-md); }
+.cart-item {
+  display: flex; align-items: center; gap: var(--space-md); padding: var(--space-md);
+  background: var(--color-white); border-radius: var(--radius-md); box-shadow: var(--shadow-sm);
+}
+.cart-item__image { width: 80px; height: 80px; border-radius: var(--radius-sm); object-fit: cover; flex-shrink: 0; }
+.cart-item__info { flex: 1; min-width: 0; }
+.cart-item__name {
+  font-family: var(--font-heading); font-weight: 600; color: var(--color-text); display: block;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cart-item__category { font-size: var(--text-xs); color: var(--color-text-muted); display: block; }
+.cart-item__price { font-family: var(--font-heading); font-weight: 700; font-size: var(--text-sm); }
+.cart-item__quantity {
+  display: flex; align-items: center; gap: var(--space-sm);
+  border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 4px;
+}
+.cart-item__qty-btn { padding: 4px; color: var(--color-text); }
+.cart-item__total {
+  font-family: var(--font-heading); font-weight: 700; min-width: 80px; text-align: right;
+}
+.cart-item__remove { color: var(--color-error); padding: 8px; transition: opacity var(--transition-fast); }
+.cart-item__remove:hover { opacity: 0.7; }
+
+.cart-page__summary {
+  background: var(--color-white); border-radius: var(--radius-md); padding: var(--space-lg);
+  box-shadow: var(--shadow-sm); position: sticky; top: calc(var(--header-height) + 16px);
+}
+.cart-page__summary h3 { margin-bottom: var(--space-md); }
+.cart-summary__row {
+  display: flex; justify-content: space-between; padding: var(--space-sm) 0;
+  font-size: var(--text-sm); color: var(--color-text-light);
+}
+.cart-summary__row--total {
+  border-top: 2px solid var(--color-border); margin-top: var(--space-sm);
+  padding-top: var(--space-md); font-family: var(--font-heading); font-weight: 700;
+  font-size: var(--text-xl); color: var(--color-text);
+}
+@media (max-width: 768px) {
+  .cart-page__grid { grid-template-columns: 1fr; }
+  .cart-item { flex-wrap: wrap; }
+  .cart-item__total { min-width: auto; }
+}

@@ -1,0 +1,66 @@
+import { useState, useEffect } from 'react';
+import { useAuthContext } from '../context/AuthContext';
+import { getUserOrders } from '../services/orderService';
+import { formatPrice } from '../utils/formatPrice';
+import { formatDateShort } from '../utils/formatDate';
+import { ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS } from '../types/order';
+import type { Order } from '../types/order';
+import { FiPackage } from 'react-icons/fi';
+import { Link } from 'react-router-dom';
+
+export default function MyOrdersPage() {
+  const { firebaseUser } = useAuthContext();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!firebaseUser) return;
+    getUserOrders(firebaseUser.uid).then(setOrders).finally(() => setLoading(false));
+  }, [firebaseUser]);
+
+  if (loading) return <div className="page-loader"><div className="spinner" /></div>;
+
+  return (
+    <div className="section">
+      <div className="container">
+        <h1 style={{ marginBottom: 'var(--space-xl)' }}>Mis pedidos</h1>
+        {orders.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 'var(--space-3xl)' }}>
+            <FiPackage size={48} style={{ color: 'var(--color-text-muted)', marginBottom: 16 }} />
+            <h3>Todavía no tenés pedidos</h3>
+            <Link to="/tienda" className="btn btn--primary" style={{ marginTop: 16 }}>Ver recursos</Link>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {orders.map((o) => (
+              <div key={o.id} style={{ background: 'var(--color-white)', borderRadius: 12, padding: 20, boxShadow: 'var(--shadow-sm)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
+                  <div>
+                    <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 700 }}>Orden #{o.id.slice(0,8)}</span>
+                    <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginLeft: 12 }}>{formatDateShort(o.createdAt)}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <span className={`badge badge--${o.status === 'paid' || o.status === 'delivered' ? 'free' : o.status === 'cancelled' ? 'out' : 'new'}`}>
+                      {ORDER_STATUS_LABELS[o.status]}
+                    </span>
+                    <span className={`badge badge--${o.paymentStatus === 'approved' ? 'free' : o.paymentStatus === 'rejected' ? 'out' : 'sale'}`}>
+                      {PAYMENT_STATUS_LABELS[o.paymentStatus]}
+                    </span>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                  {o.items.map((item, i) => (
+                    <span key={i} style={{ fontSize: 'var(--text-sm)', background: 'var(--color-bg-alt)', padding: '4px 10px', borderRadius: 20 }}>{item.name} x{item.quantity}</span>
+                  ))}
+                </div>
+                <div style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: 'var(--text-lg)' }}>
+                  Total: {formatPrice(o.total)}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
