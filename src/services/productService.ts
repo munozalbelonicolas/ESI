@@ -31,13 +31,33 @@ const FALLBACK_PRODUCTS: Product[] = SAMPLE_PRODUCTS.map((p, i) => ({
   updatedAt: Timestamp.now(),
 }));
 
+// Memory cache with 5-minute TTL
+const CACHE_TTL = 5 * 60 * 1000;
+const productsCache = new Map<string, { timestamp: number; data: { products: Product[]; lastVisible: DocumentSnapshot | null } }>();
+const featuredCache = new Map<string, { timestamp: number; data: Product[] }>();
+
+export function clearProductsCache(): void {
+  productsCache.clear();
+  featuredCache.clear();
+}
+
 /**
- * Obtiene productos activos con paginación. Fallback a muestra si falla Firestore.
+ * Obtiene productos activos con paginación y caché en memoria. Fallback a muestra si falla Firestore.
  */
 export async function getProducts(
   category?: string,
   lastDoc?: DocumentSnapshot
 ): Promise<{ products: Product[]; lastVisible: DocumentSnapshot | null }> {
+  const cacheKey = category || '__ALL__';
+  
+  // Usar caché solo para la primera página (sin lastDoc)
+  if (!lastDoc) {
+    const cached = productsCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      return cached.data;
+    }
+  }
+
   try {
     let q = query(
       collection(db, COLLECTION),
@@ -65,18 +85,26 @@ export async function getProducts(
       const filtered = category
         ? FALLBACK_PRODUCTS.filter((p) => p.category === category)
         : FALLBACK_PRODUCTS;
-      return { products: filtered, lastVisible: null };
+      const res = { products: filtered, lastVisible: null };
+      if (!lastDoc) productsCache.set(cacheKey, { timestamp: Date.now(), data: res });
+      return res;
     }
     const products = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Product);
     const lastVisible = snap.docs[snap.docs.length - 1] || null;
 
-    return { products, lastVisible };
+    const result = { products, lastVisible };
+    if (!lastDoc) {
+      productsCache.set(cacheKey, { timestamp: Date.now(), data: result });
+    }
+    return result;
   } catch (err) {
     console.warn('[productService] Firestore no disponible, usando datos de muestra:', err);
     const filtered = category
       ? FALLBACK_PRODUCTS.filter((p) => p.category === category)
       : FALLBACK_PRODUCTS;
-    return { products: filtered, lastVisible: null };
+    const res = { products: filtered, lastVisible: null };
+    if (!lastDoc) productsCache.set(cacheKey, { timestamp: Date.now(), data: res });
+    return res;
   }
 }
 
@@ -128,6 +156,7 @@ export async function getProductById(id: string): Promise<Product | null> {
  * Crea un nuevo producto (admin).
  */
 export async function createProduct(data: ProductFormData): Promise<string> {
+  clearProductsCache();
   const ref = await addDoc(collection(db, COLLECTION), {
     ...data,
     slug: slugify(data.name),
@@ -144,6 +173,7 @@ export async function updateProduct(
   id: string,
   data: Partial<ProductFormData>
 ): Promise<void> {
+  clearProductsCache();
   await updateDoc(doc(db, COLLECTION, id), {
     ...data,
     slug: data.name ? slugify(data.name) : undefined,
@@ -155,13 +185,20 @@ export async function updateProduct(
  * Elimina un producto (admin).
  */
 export async function deleteProduct(id: string): Promise<void> {
+  clearProductsCache();
   await deleteDoc(doc(db, COLLECTION, id));
 }
 
 /**
- * Obtiene productos destacados.
+ * Obtiene productos destacados con caché en memoria.
  */
 export async function getFeaturedProducts(count: number = 8): Promise<Product[]> {
+  const cacheKey = `featured_${count}`;
+  const cached = featuredCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data;
+  }
+
   try {
     const q = query(
       collection(db, COLLECTION),
@@ -171,12 +208,16 @@ export async function getFeaturedProducts(count: number = 8): Promise<Product[]>
     );
     const snap = await getDocs(q);
     if (!snap.empty) {
-      return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Product);
+      const prods = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Product);
+      featuredCache.set(cacheKey, { timestamp: Date.now(), data: prods });
+      return prods;
     }
   } catch {
     // fallback
   }
-  return FALLBACK_PRODUCTS.slice(0, count);
+  const fallback = FALLBACK_PRODUCTS.slice(0, count);
+  featuredCache.set(cacheKey, { timestamp: Date.now(), data: fallback });
+  return fallback;
 }
 
 /**

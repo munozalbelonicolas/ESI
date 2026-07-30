@@ -70,6 +70,24 @@
   color: rgba(255, 255, 255, 0.5);
 }
 
+.footer__powered {
+  font-size: var(--text-xs);
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: var(--space-xs);
+}
+
+.footer__powered-link {
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: 600;
+  transition: color var(--transition-fast);
+}
+
+.footer__powered-link:hover {
+  text-decoration: underline;
+  color: #ffffff;
+}
+
 @media (max-width: 768px) {
   .footer__grid {
     grid-template-columns: 1fr 1fr;

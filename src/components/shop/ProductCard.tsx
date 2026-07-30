@@ -2,15 +2,17 @@ import { Link } from 'react-router-dom';
 import { useCartContext } from '../../context/CartContext';
 import { formatPrice, calcDiscount } from '../../utils/formatPrice';
 import { trackAddToCart } from '../../config/analytics';
+import { getOptimizedImageUrl } from '../../utils/imageUtils';
 import type { Product } from '../../types/product';
 import { FiShoppingBag, FiDownload } from 'react-icons/fi';
 import './ProductCard.css';
 
 interface Props {
   product: Product;
+  priority?: boolean;
 }
 
-export default function ProductCard({ product }: Props) {
+export default function ProductCard({ product, priority = false }: Props) {
   const { addItem, isInCart } = useCartContext();
   const discount = product.compareAtPrice ? calcDiscount(product.price, product.compareAtPrice) : 0;
   const isOutOfStock = !product.isDigital && product.stock === 0;
@@ -24,14 +26,18 @@ export default function ProductCard({ product }: Props) {
     trackAddToCart(product.id, product.name, product.price, 1);
   };
 
+  const imageUrl = getOptimizedImageUrl(product.images[0], 500);
+
   return (
     <Link to={`/tienda/${product.slug}`} className="product-card card">
       <div className="product-card__image-wrapper">
         <img
-          src={product.images[0] || '/placeholder-product.png'}
+          src={imageUrl}
           alt={product.name}
           className="product-card__image"
-          loading="lazy"
+          loading={priority ? 'eager' : 'lazy'}
+          decoding="async"
+          {...(priority ? { fetchPriority: 'high' } : {})}
         />
         <div className="product-card__badges">
           {product.isFree && <span className="badge badge--free">Gratis</span>}

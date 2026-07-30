@@ -57,6 +57,17 @@ export default function Footer() {
           <p className="footer__copyright">
             © {new Date().getFullYear()} {SITE_CONFIG.name}. Todos los derechos reservados.
           </p>
+          <p className="footer__powered">
+            Powered by{' '}
+            <a
+              href="https://nilotech.online/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="footer__powered-link"
+            >
+              NiloTech
+            </a>
+          </p>
         </div>
       </div>
     </footer>

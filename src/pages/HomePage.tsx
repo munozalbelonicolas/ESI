@@ -9,7 +9,7 @@ import type { Product } from '../types/product';
 import type { BlogPost } from '../types/blog';
 import { formatDate } from '../utils/formatDate';
 import { FiArrowRight, FiBookOpen, FiHeart, FiUsers, FiAward } from 'react-icons/fi';
-import crisImage from '../assets/cris.svg';
+import crisImage from '../assets/cris.webp';
 import './HomePage.css';
 
 export default function HomePage() {
@@ -141,8 +141,8 @@ export default function HomePage() {
             </div>
           ) : (
             <div className="grid grid--products">
-              {products.map((p) => (
-                <ProductCard key={p.id} product={p} />
+              {products.map((p, i) => (
+                <ProductCard key={p.id} product={p} priority={i < 4} />
               ))}
             </div>
           )}
@@ -189,7 +189,7 @@ export default function HomePage() {
             <div className="about__visual">
               <div className="about__image-wrapper">
                 <div className="about__portrait-frame">
-                  <img src={crisImage} alt="Cristina Bronzatti — ESI en Secundaria" className="about__portrait-img" />
+                  <img src={crisImage} alt="Cristina Bronzatti — ESI en Secundaria" className="about__portrait-img" loading="lazy" />
                 </div>
               </div>
             </div>

@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { getProductBySlug } from '../services/productService';
 import { useCartContext } from '../context/CartContext';
 import { formatPrice, calcDiscount } from '../utils/formatPrice';
+import { getOptimizedImageUrl } from '../utils/imageUtils';
 import { trackViewItem, trackAddToCart } from '../config/analytics';
 import type { Product } from '../types/product';
 import { FiShoppingBag, FiArrowLeft, FiMinus, FiPlus, FiDownload } from 'react-icons/fi';
@@ -60,9 +61,11 @@ export default function ProductPage() {
               {product.isFree && <span className="badge badge--free product-page__badge">Gratis</span>}
               {isOutOfStock && <span className="badge badge--out product-page__badge">Sin stock</span>}
               <img
-                src={product.images[selectedImage] || '/placeholder-product.png'}
+                src={getOptimizedImageUrl(product.images[selectedImage], 800)}
                 alt={product.name}
                 className="product-page__main-image"
+                loading="eager"
+                decoding="async"
               />
             </div>
             {product.images.length > 1 && (
@@ -73,7 +76,7 @@ export default function ProductPage() {
                     className={`product-page__thumb ${i === selectedImage ? 'product-page__thumb--active' : ''}`}
                     onClick={() => setSelectedImage(i)}
                   >
-                    <img src={img} alt={`${product.name} ${i + 1}`} />
+                    <img src={getOptimizedImageUrl(img, 150)} alt={`${product.name} ${i + 1}`} loading="lazy" />
                   </button>
                 ))}
               </div>
