@@ -7,7 +7,7 @@ import { getOptimizedImageUrl } from '../utils/imageUtils';
 import { getShippingQuotes, isValidShippingZipCode, type ShippingQuote } from '../services/shippingService';
 import { trackViewItem, trackAddToCart } from '../config/analytics';
 import type { Product } from '../types/product';
-import { FiShoppingBag, FiArrowLeft, FiMinus, FiPlus, FiDownload, FiTruck, FiSearch } from 'react-icons/fi';
+import { FiShoppingBag, FiArrowLeft, FiMinus, FiPlus, FiDownload, FiTruck, FiSearch, FiTag, FiInfo } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import './ProductPage.css';
 
@@ -124,8 +124,20 @@ export default function ProductPage() {
               )}
             </div>
 
+            {product.transferDiscountPercent && product.transferDiscountPercent > 0 && !product.isFree && (
+              <div style={{ marginTop: 12, padding: '10px 14px', background: '#e8f8f5', borderRadius: 8, border: '1px solid #a3e4d7', color: '#117a65', fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <FiTag size={20} style={{ color: '#16a085', flexShrink: 0 }} />
+                <div>
+                  <strong>{product.transferDiscountPercent}% OFF</strong> pagando con <b>Transferencia Bancaria</b>
+                  <div style={{ fontSize: 'var(--text-xs)', marginTop: 2 }}>
+                    Precio final: <strong style={{ fontSize: 'var(--text-sm)', color: '#0e6251' }}>{formatPrice(Math.round(product.price * (1 - product.transferDiscountPercent / 100)))}</strong>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {product.isDigital && (
-              <p className="product-page__digital-note">
+              <p className="product-page__digital-note" style={{ marginTop: 12 }}>
                 <FiDownload /> Producto digital — se envía por email después de la compra
               </p>
             )}
@@ -157,6 +169,10 @@ export default function ProductPage() {
 
             {!product.isDigital && (
               <div className="product-page__shipping-calc" style={{ marginTop: 24, padding: 16, background: 'var(--color-bg-alt)', borderRadius: 12, border: '1px solid var(--color-border)' }}>
+                <div style={{ marginBottom: 12, padding: '8px 12px', background: 'rgba(255, 225, 100, 0.3)', borderRadius: 8, border: '1px solid var(--color-border)', fontSize: 'var(--text-xs)', display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: 'var(--color-text)' }}>
+                  <FiInfo size={16} style={{ color: 'var(--color-primary-dark)', flexShrink: 0 }} />
+                  <span>📦 Envíos: miércoles y viernes — Tener en cuenta los tiempos de producción</span>
+                </div>
                 <h4 style={{ margin: '0 0 8px 0', fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', gap: 8, color: 'var(--color-text)' }}>
                   <FiTruck size={18} style={{ color: 'var(--color-primary)' }} /> Calcular envío por Correo Argentino
                 </h4>

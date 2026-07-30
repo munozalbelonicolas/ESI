@@ -16,6 +16,7 @@ export interface Product {
   digitalFileUrl: string | null;
   weightGrams?: number;
   customShippingPrice?: number | null;
+  transferDiscountPercent?: number | null;
   isActive: boolean;
   tags: string[];
   createdAt: Timestamp;
@@ -36,6 +37,7 @@ export interface ProductFormData {
   digitalFileUrl: string | null;
   weightGrams?: number;
   customShippingPrice?: number | null;
+  transferDiscountPercent?: number | null;
   isActive: boolean;
   tags: string[];
 }

@@ -16,7 +16,8 @@ export default function AdminProductsPage() {
   const [form, setForm] = useState<ProductFormData>({
     name: '', description: '', shortDescription: '', price: 0, compareAtPrice: null,
     isFree: false, category: PRODUCT_CATEGORIES[0], images: [], stock: -1,
-    isDigital: true, digitalFileUrl: null, weightGrams: 500, customShippingPrice: null, isActive: true, tags: [],
+    isDigital: true, digitalFileUrl: null, weightGrams: 500, customShippingPrice: null,
+    transferDiscountPercent: null, isActive: true, tags: [],
   });
 
   const loadProducts = async () => {
@@ -28,7 +29,12 @@ export default function AdminProductsPage() {
   useEffect(() => { loadProducts(); }, []);
 
   const resetForm = () => {
-    setForm({ name: '', description: '', shortDescription: '', price: 0, compareAtPrice: null, isFree: false, category: PRODUCT_CATEGORIES[0], images: [], stock: -1, isDigital: true, digitalFileUrl: null, weightGrams: 500, customShippingPrice: null, isActive: true, tags: [] });
+    setForm({
+      name: '', description: '', shortDescription: '', price: 0, compareAtPrice: null,
+      isFree: false, category: PRODUCT_CATEGORIES[0], images: [], stock: -1,
+      isDigital: true, digitalFileUrl: null, weightGrams: 500, customShippingPrice: null,
+      transferDiscountPercent: null, isActive: true, tags: []
+    });
     setEditingId(null);
     setShowForm(false);
   };
@@ -39,6 +45,7 @@ export default function AdminProductsPage() {
       price: p.price, compareAtPrice: p.compareAtPrice, isFree: p.isFree, category: p.category,
       images: p.images, stock: p.stock, isDigital: p.isDigital, digitalFileUrl: p.digitalFileUrl,
       weightGrams: p.weightGrams ?? 500, customShippingPrice: p.customShippingPrice ?? null,
+      transferDiscountPercent: p.transferDiscountPercent ?? null,
       isActive: p.isActive, tags: p.tags
     });
     setEditingId(p.id);
@@ -138,7 +145,7 @@ export default function AdminProductsPage() {
               <label className="form-label">Descripción completa (HTML)</label>
               <textarea className="form-textarea" value={form.description} onChange={e => update('description', e.target.value)} rows={6} />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16 }}>
               <div className="form-group">
                 <label className="form-label">Precio ($)</label>
                 <input className="form-input" type="number" value={form.price} onChange={e => update('price', Number(e.target.value))} min={0} />
@@ -146,6 +153,10 @@ export default function AdminProductsPage() {
               <div className="form-group">
                 <label className="form-label">Precio anterior ($)</label>
                 <input className="form-input" type="number" value={form.compareAtPrice || ''} onChange={e => update('compareAtPrice', e.target.value ? Number(e.target.value) : null)} min={0} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Desc. Transferencia (%)</label>
+                <input className="form-input" type="number" placeholder="Ej: 5" value={form.transferDiscountPercent || ''} onChange={e => update('transferDiscountPercent', e.target.value ? Number(e.target.value) : null)} min={0} max={100} />
               </div>
               <div className="form-group">
                 <label className="form-label">Stock (-1 = ilimitado)</label>

@@ -42,6 +42,11 @@ export default function ProductCard({ product, priority = false }: Props) {
         <div className="product-card__badges">
           {product.isFree && <span className="badge badge--free">Gratis</span>}
           {discount > 0 && <span className="badge badge--sale">{discount}% OFF</span>}
+          {product.transferDiscountPercent && product.transferDiscountPercent > 0 && (
+            <span className="badge badge--sale" style={{ background: '#27ae60' }}>
+              {product.transferDiscountPercent}% OFF Transf.
+            </span>
+          )}
           {isOutOfStock && <span className="badge badge--out">Sin stock</span>}
           {product.isDigital && <span className="badge badge--digital">Digital</span>}
         </div>
@@ -61,6 +66,11 @@ export default function ProductCard({ product, priority = false }: Props) {
             </>
           )}
         </div>
+        {product.transferDiscountPercent && product.transferDiscountPercent > 0 && !product.isFree && (
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-success)', fontWeight: 600, marginTop: 2 }}>
+            {product.transferDiscountPercent}% OFF con Transferencia
+          </div>
+        )}
         <button
           className={`product-card__btn btn ${alreadyInCart ? 'btn--ghost' : 'btn--primary'} btn--sm btn--full`}
           onClick={handleAddToCart}
