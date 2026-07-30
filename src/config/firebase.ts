@@ -18,6 +18,8 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 export const auth = getAuth(app);
+auth.languageCode = 'es'; // Configurar correos de verificación y reseteo en Español
+
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 
