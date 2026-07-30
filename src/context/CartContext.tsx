@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import toast from 'react-hot-toast';
 import type { Product } from '../types/product';
 
 export interface CartItem {
@@ -61,6 +62,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         );
       }
       return [...prev, { product, quantity }];
+    });
+
+    toast.success(`🛒 "${product.name}" agregado al carrito`, {
+      duration: 2000,
+      id: `cart-add-${product.id}`,
     });
   }, []);
 
