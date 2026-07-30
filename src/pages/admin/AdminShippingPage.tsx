@@ -9,7 +9,7 @@ import {
   DEFAULT_SHIPPING_SETTINGS,
 } from '../../services/shippingService';
 import { formatPrice } from '../../utils/formatPrice';
-import { FiTruck, FiSave, FiTrendingUp, FiSearch } from 'react-icons/fi';
+import { FiTruck, FiSave, FiTrendingUp, FiSearch, FiKey, FiGlobe, FiAlertCircle, FiCheckCircle } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 
 const ZONES: { key: 'regional' | 'nacional'; label: string; desc: string }[] = [
@@ -67,10 +67,10 @@ export default function AdminShippingPage() {
     setSaving(true);
     try {
       await saveShippingSettings(settings);
-      toast.success('Tabla oficial de tarifas de Correo Argentino guardada');
+      toast.success('Configuración de envíos y tarifas guardadas correctamente');
     } catch (err: any) {
       console.error(err);
-      toast.error('Error al guardar tarifas');
+      toast.error('Error al guardar configuración');
     } finally {
       setSaving(false);
     }
@@ -92,7 +92,7 @@ export default function AdminShippingPage() {
     });
 
     setSettings(updated);
-    toast.success(`Ajuste de ${percent > 0 ? '+' : ''}${percent}% aplicado a la matriz oficial.`);
+    toast.success(`Ajuste de ${percent > 0 ? '+' : ''}${percent}% aplicado a la matriz de respaldo.`);
   };
 
   const handleTestCalculations = async (e: React.FormEvent) => {
@@ -114,22 +114,98 @@ export default function AdminShippingPage() {
 
   if (loading) return <div className="page-loader"><div className="spinner" /></div>;
 
+  const isApiConfigured = !!(settings.useLiveApi && settings.apiCustomerId && settings.apiToken);
+
   return (
     <div className="admin-shipping-page">
       <div className="admin-header">
         <div>
-          <h1>Tabla Tarifaria Oficial — Correo Argentino</h1>
+          <h1>Gestor de Envíos — Correo Argentino</h1>
           <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)', marginTop: 4 }}>
-            Visualizá y actualizá la tabla oficial de precios por clase de producto (peso) y cobertura (Regional vs Nacional).
+            Configurá la integración oficial con la API de Correo Argentino (Paq.ar / MiCorreo) y la tabla tarifaria de respaldo.
           </p>
         </div>
       </div>
 
       <form onSubmit={handleSave}>
-        {/* Tabla Oficial de Precios Correo Argentino */}
+        {/* Módulo de Integración API Oficial Paq.ar */}
+        <div className="admin-card" style={{ background: 'var(--color-bg)', padding: 24, borderRadius: 12, border: '1px solid var(--color-border)', marginBottom: 24 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--text-lg)' }}>
+              <FiKey style={{ color: 'var(--color-primary)' }} /> API Oficial Correo Argentino (Paq.ar / MiCorreo)
+            </h3>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 12px', background: isApiConfigured ? '#e8f8f5' : '#fef9e7', borderRadius: 20, border: `1px solid ${isApiConfigured ? '#a3e4d7' : '#f9e79f'}`, fontSize: 'var(--text-xs)' }}>
+              {isApiConfigured ? (
+                <>
+                  <FiCheckCircle style={{ color: '#27ae60' }} />
+                  <strong style={{ color: '#196f3d' }}>API en Vivo Activa</strong>
+                </>
+              ) : (
+                <>
+                  <FiAlertCircle style={{ color: '#f39c12' }} />
+                  <strong style={{ color: '#b7950b' }}>Usando Tabla de Respaldo</strong>
+                </>
+              )}
+            </div>
+          </div>
+
+          <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 20 }}>
+            Ingresá las credenciales de tu cuenta comercial de Correo Argentino para cotizar automáticamente en vivo. Si no tenés las credenciales cargadas o falla la conexión, el sistema usará la matriz de respaldo automáticamente.
+          </p>
+
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontWeight: 600 }}>
+              <input
+                type="checkbox"
+                checked={!!settings.useLiveApi}
+                onChange={(e) => setSettings({ ...settings, useLiveApi: e.target.checked })}
+                style={{ width: 18, height: 18, accentColor: 'var(--color-primary)' }}
+              />
+              Activar Cotización en Vivo por API Oficial de Correo Argentino
+            </label>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label" style={{ fontWeight: 600 }}>N° de Cliente / Acuerdo Paq.ar</label>
+              <input
+                className="form-input"
+                placeholder="Ej: 00012345"
+                value={settings.apiCustomerId || ''}
+                onChange={(e) => setSettings({ ...settings, apiCustomerId: e.target.value.trim() })}
+              />
+            </div>
+
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label" style={{ fontWeight: 600 }}>API Token / Clave de Acceso</label>
+              <input
+                type="password"
+                className="form-input"
+                placeholder="Token de MiCorreo / Paq.ar"
+                value={settings.apiToken || ''}
+                onChange={(e) => setSettings({ ...settings, apiToken: e.target.value.trim() })}
+              />
+            </div>
+
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label" style={{ fontWeight: 600 }}>Código Postal de Origen (Despacho)</label>
+              <input
+                className="form-input"
+                placeholder="Ej: 1425"
+                maxLength={4}
+                value={settings.originZipCode || ''}
+                onChange={(e) => setSettings({ ...settings, originZipCode: e.target.value.replace(/\D/g, '') })}
+              />
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>CP desde donde se envían las órdenes.</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Tabla Oficial de Precios Correo Argentino (Respaldo) */}
         <div className="admin-card" style={{ background: 'var(--color-bg)', padding: 24, borderRadius: 12, border: '1px solid var(--color-border)', marginBottom: 24, overflowX: 'auto' }}>
           <h3 style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--text-lg)' }}>
-            <FiTruck style={{ color: 'var(--color-primary)' }} /> Tarifas Oficiales Correo Argentino (ARS $)
+            <FiTruck style={{ color: 'var(--color-primary)' }} /> Matriz Tarifaria Oficial (Respaldo en caso de sin API)
           </h3>
 
           <table className="admin-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
@@ -168,7 +244,7 @@ export default function AdminShippingPage() {
 
           <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end' }}>
             <button type="submit" className="btn btn--primary btn--lg" disabled={saving}>
-              <FiSave /> {saving ? 'Guardando...' : 'Guardar Tabla Oficial'}
+              <FiSave /> {saving ? 'Guardando...' : 'Guardar Configuración de Envíos'}
             </button>
           </div>
         </div>
@@ -178,10 +254,10 @@ export default function AdminShippingPage() {
         {/* Ajuste Masivo Porcentual */}
         <div className="admin-card" style={{ background: 'var(--color-bg-alt)', padding: 24, borderRadius: 12, border: '1px solid var(--color-border)' }}>
           <h3 style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--text-md)', color: 'var(--color-primary)' }}>
-            <FiTrendingUp /> Ajuste Porcentual Masivo
+            <FiTrendingUp /> Ajuste Porcentual a Tabla de Respaldo
           </h3>
           <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginBottom: 16 }}>
-            Aplicá un aumento o ajuste masivo a toda la tabla oficial de precios.
+            Calculá un aumento o descuento porcentual sobre las celdas de la tabla de respaldo.
           </p>
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
