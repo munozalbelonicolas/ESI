@@ -18,19 +18,26 @@ export interface ShippingQuote {
   provider: 'Correo Argentino';
 }
 
+export interface ZoneWeightRates {
+  w500g: number;
+  w1kg: number;
+  w3kg: number;
+  w5kg: number;
+}
+
 export interface ShippingSettings {
-  localRate: number;       // CABA y GBA (CPs 1000-1899)
-  regionalRate: number;    // Prov. BsAs, Sta Fe, Cba (CPs 2000-7999 parte)
-  nacional1Rate: number;   // NOA, NEA, Cuyo (CPs 3000-6000 parte)
-  nacional2Rate: number;   // Patagonia (CPs 8000-9999)
-  freeShippingMin: number; // Monto mínimo para envío gratis opcional (0 = desactivado)
+  local: ZoneWeightRates;
+  regional: ZoneWeightRates;
+  nacional1: ZoneWeightRates;
+  nacional2: ZoneWeightRates;
+  freeShippingMin: number;
 }
 
 export const DEFAULT_SHIPPING_SETTINGS: ShippingSettings = {
-  localRate: 3800,
-  regionalRate: 5200,
-  nacional1Rate: 6000,
-  nacional2Rate: 7800,
+  local: { w500g: 3800, w1kg: 4750, w3kg: 6080, w5kg: 7980 },
+  regional: { w500g: 5200, w1kg: 6500, w3kg: 8320, w5kg: 10920 },
+  nacional1: { w500g: 6000, w1kg: 7500, w3kg: 9600, w5kg: 12600 },
+  nacional2: { w500g: 7800, w1kg: 9750, w3kg: 12480, w5kg: 16380 },
   freeShippingMin: 0,
 };
 
@@ -47,7 +54,19 @@ export async function getShippingSettings(): Promise<ShippingSettings> {
   try {
     const snap = await getDoc(SETTINGS_DOC);
     if (snap.exists()) {
-      cachedSettings = { ...DEFAULT_SHIPPING_SETTINGS, ...snap.data() } as ShippingSettings;
+      const data = snap.data();
+      // Si existían settings planos de versión previa, migrar a objeto estructurado
+      if (data.localRate && !data.local) {
+        cachedSettings = {
+          local: { w500g: data.localRate, w1kg: Math.round(data.localRate * 1.25), w3kg: Math.round(data.localRate * 1.6), w5kg: Math.round(data.localRate * 2.1) },
+          regional: { w500g: data.regionalRate, w1kg: Math.round(data.regionalRate * 1.25), w3kg: Math.round(data.regionalRate * 1.6), w5kg: Math.round(data.regionalRate * 2.1) },
+          nacional1: { w500g: data.nacional1Rate, w1kg: Math.round(data.nacional1Rate * 1.25), w3kg: Math.round(data.nacional1Rate * 1.6), w5kg: Math.round(data.nacional1Rate * 2.1) },
+          nacional2: { w500g: data.nacional2Rate, w1kg: Math.round(data.nacional2Rate * 1.25), w3kg: Math.round(data.nacional2Rate * 1.6), w5kg: Math.round(data.nacional2Rate * 2.1) },
+          freeShippingMin: data.freeShippingMin || 0,
+        };
+      } else {
+        cachedSettings = { ...DEFAULT_SHIPPING_SETTINGS, ...data } as ShippingSettings;
+      }
       return cachedSettings;
     }
   } catch (err) {
@@ -58,7 +77,7 @@ export async function getShippingSettings(): Promise<ShippingSettings> {
 }
 
 /**
- * Guarda la nueva configuración de tarifas en Firestore (Admin).
+ * Guarda la nueva configuración de tarifas por peso en Firestore (Admin).
  */
 export async function saveShippingSettings(settings: ShippingSettings): Promise<void> {
   await setDoc(SETTINGS_DOC, settings, { merge: true });
@@ -66,16 +85,17 @@ export async function saveShippingSettings(settings: ShippingSettings): Promise<
 }
 
 /**
- * Calcula el multiplicador de peso según los gramos totales del paquete.
- * Escalas oficiales: 0-500g, 501g-1kg, 1kg-3kg, 3kg-5kg, >5kg.
+ * Determina el tramo de peso adecuado de las configuraciones.
  */
-function getWeightMultiplier(weightGrams: number): number {
-  if (weightGrams <= 500) return 1.0;
-  if (weightGrams <= 1000) return 1.25;
-  if (weightGrams <= 3000) return 1.6;
-  if (weightGrams <= 5000) return 2.1;
+function getRateByWeight(zoneRates: ZoneWeightRates, weightGrams: number): number {
+  if (weightGrams <= 500) return zoneRates.w500g;
+  if (weightGrams <= 1000) return zoneRates.w1kg;
+  if (weightGrams <= 3000) return zoneRates.w3kg;
+  if (weightGrams <= 5000) return zoneRates.w5kg;
+
+  // Para > 5kg, tomar el valor de 5kg y sumar 15% por cada kg extra
   const extraKgos = Math.ceil((weightGrams - 5000) / 1000);
-  return 2.5 + extraKgos * 0.3;
+  return Math.round(zoneRates.w5kg * (1 + extraKgos * 0.15));
 }
 
 /**
@@ -85,14 +105,10 @@ function getZoneFromZip(zipCode: string): 'local' | 'regional' | 'nacional1' | '
   const code = parseInt(zipCode, 10);
   if (isNaN(code)) return 'nacional1';
 
-  // 1000 a 1899: CABA y GBA
   if (code >= 1000 && code < 1900) return 'local';
-  // 1900 a 3000 o 6000 a 7600: Regional (BsAs Prov, Rosario, Santa Fe, Córdoba)
   if ((code >= 1900 && code < 3100) || (code >= 5000 && code < 6000) || (code >= 7000 && code < 8000)) return 'regional';
-  // 8000+: Patagonia (Bahía Blanca sur, Río Negro, Neuquén, Chubut, Santa Cruz, Tierra del Fuego)
   if (code >= 8000) return 'nacional2';
 
-  // Resto: NOA / NEA / Cuyo
   return 'nacional1';
 }
 
@@ -109,15 +125,13 @@ export async function getShippingQuotes(
   customOverridePrice?: number | null
 ): Promise<ShippingQuote[]> {
   const settings = await getShippingSettings();
-  const zone = getZoneFromZip(zipCode);
+  const zoneKey = getZoneFromZip(zipCode);
+  const zoneRates = settings[zoneKey] || DEFAULT_SHIPPING_SETTINGS.regional;
 
-  let basePrice = settings[`${zone}Rate` as keyof ShippingSettings] as number || DEFAULT_SHIPPING_SETTINGS.regionalRate;
-  const weightMult = getWeightMultiplier(totalWeight);
+  let basePrice = getRateByWeight(zoneRates, totalWeight);
 
   if (customOverridePrice && customOverridePrice > 0) {
     basePrice = customOverridePrice;
-  } else {
-    basePrice = Math.round(basePrice * weightMult);
   }
 
   const quotes: ShippingQuote[] = [
