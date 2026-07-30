@@ -31,6 +31,7 @@ export const ADMIN_NAV_LINKS = [
   { label: 'Blog', path: '/admin/blog', icon: 'blog' },
   { label: 'Órdenes', path: '/admin/ordenes', icon: 'orders' },
   { label: 'Cupones', path: '/admin/cupones', icon: 'coupons' },
+  { label: 'Envíos', path: '/admin/envios', icon: 'shipping' },
 ] as const;
 
 export const PROVINCES = [

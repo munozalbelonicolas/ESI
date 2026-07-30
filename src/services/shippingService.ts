@@ -1,3 +1,6 @@
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '../config/firebase';
+
 /**
  * Módulo de envío — Tarifario Oficial Correo Argentino
  * ====================================================
@@ -15,17 +18,52 @@ export interface ShippingQuote {
   provider: 'Correo Argentino';
 }
 
-/** Tarifas base de Correo Argentino por zona (pesos argentinos) */
-const ZONE_BASE_RATES: Record<string, number> = {
-  // CABA y GBA (Local / Z1)
-  '1000': 3600, '1100': 3800, '1400': 3800, '1600': 4100, '1700': 4100, '1800': 4100,
-  // Provincia de Buenos Aires / Santa Fe / Córdoba (Regional / Z2)
-  '2000': 4800, '3000': 5200, '5000': 5400, '6000': 5200, '7000': 5000,
-  // NOA / Cuyo / NEA (Nacional 1 / Z3)
-  '4000': 5800, '5500': 6200, '3300': 6000, '4400': 6400,
-  // Patagonia / Extremo Sur (Nacional 2 / Z4)
-  '8000': 6900, '9000': 7800, '9410': 8500,
+export interface ShippingSettings {
+  localRate: number;       // CABA y GBA (CPs 1000-1899)
+  regionalRate: number;    // Prov. BsAs, Sta Fe, Cba (CPs 2000-7999 parte)
+  nacional1Rate: number;   // NOA, NEA, Cuyo (CPs 3000-6000 parte)
+  nacional2Rate: number;   // Patagonia (CPs 8000-9999)
+  freeShippingMin: number; // Monto mínimo para envío gratis opcional (0 = desactivado)
+}
+
+export const DEFAULT_SHIPPING_SETTINGS: ShippingSettings = {
+  localRate: 3800,
+  regionalRate: 5200,
+  nacional1Rate: 6000,
+  nacional2Rate: 7800,
+  freeShippingMin: 0,
 };
+
+const SETTINGS_DOC = doc(db, 'settings', 'shipping');
+
+// In-memory cache for shipping settings
+let cachedSettings: ShippingSettings | null = null;
+
+/**
+ * Obtiene la configuración de envíos desde Firestore con fallback local.
+ */
+export async function getShippingSettings(): Promise<ShippingSettings> {
+  if (cachedSettings) return cachedSettings;
+  try {
+    const snap = await getDoc(SETTINGS_DOC);
+    if (snap.exists()) {
+      cachedSettings = { ...DEFAULT_SHIPPING_SETTINGS, ...snap.data() } as ShippingSettings;
+      return cachedSettings;
+    }
+  } catch (err) {
+    console.warn('[shippingService] Error cargando settings de envío de Firestore, usando defaults:', err);
+  }
+  cachedSettings = DEFAULT_SHIPPING_SETTINGS;
+  return cachedSettings;
+}
+
+/**
+ * Guarda la nueva configuración de tarifas en Firestore (Admin).
+ */
+export async function saveShippingSettings(settings: ShippingSettings): Promise<void> {
+  await setDoc(SETTINGS_DOC, settings, { merge: true });
+  cachedSettings = settings;
+}
 
 /**
  * Calcula el multiplicador de peso según los gramos totales del paquete.
@@ -41,12 +79,21 @@ function getWeightMultiplier(weightGrams: number): number {
 }
 
 /**
- * Obtiene la tarifa base estimada según el Código Postal argentino.
+ * Determina la zona postal del código postal argentino.
  */
-function getBaseRateByZip(zipCode: string): number {
-  if (ZONE_BASE_RATES[zipCode]) return ZONE_BASE_RATES[zipCode];
-  const prefix = zipCode.charAt(0) + '000';
-  return ZONE_BASE_RATES[prefix] || 5200; // Tarifa promedio nacional por defecto
+function getZoneFromZip(zipCode: string): 'local' | 'regional' | 'nacional1' | 'nacional2' {
+  const code = parseInt(zipCode, 10);
+  if (isNaN(code)) return 'nacional1';
+
+  // 1000 a 1899: CABA y GBA
+  if (code >= 1000 && code < 1900) return 'local';
+  // 1900 a 3000 o 6000 a 7600: Regional (BsAs Prov, Rosario, Santa Fe, Córdoba)
+  if ((code >= 1900 && code < 3100) || (code >= 5000 && code < 6000) || (code >= 7000 && code < 8000)) return 'regional';
+  // 8000+: Patagonia (Bahía Blanca sur, Río Negro, Neuquén, Chubut, Santa Cruz, Tierra del Fuego)
+  if (code >= 8000) return 'nacional2';
+
+  // Resto: NOA / NEA / Cuyo
+  return 'nacional1';
 }
 
 /**
@@ -61,10 +108,10 @@ export async function getShippingQuotes(
   totalWeight: number = 500,
   customOverridePrice?: number | null
 ): Promise<ShippingQuote[]> {
-  // Simular pequeña latencia de cálculo
-  await new Promise((r) => setTimeout(r, 300));
+  const settings = await getShippingSettings();
+  const zone = getZoneFromZip(zipCode);
 
-  let basePrice = getBaseRateByZip(zipCode);
+  let basePrice = settings[`${zone}Rate` as keyof ShippingSettings] as number || DEFAULT_SHIPPING_SETTINGS.regionalRate;
   const weightMult = getWeightMultiplier(totalWeight);
 
   if (customOverridePrice && customOverridePrice > 0) {
