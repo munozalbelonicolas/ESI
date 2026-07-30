@@ -1,11 +1,11 @@
 import { Outlet, NavLink, Link } from 'react-router-dom';
 import { ADMIN_NAV_LINKS, SITE_CONFIG } from '../../config/site';
-import { FiGrid, FiPackage, FiEdit3, FiShoppingCart, FiTag, FiTruck, FiCreditCard, FiArrowLeft } from 'react-icons/fi';
+import { FiGrid, FiPackage, FiEdit3, FiShoppingCart, FiTag, FiTruck, FiCreditCard, FiDollarSign, FiArrowLeft } from 'react-icons/fi';
 import './Admin.css';
 
 const ICONS: Record<string, React.ReactNode> = {
   dashboard: <FiGrid />, products: <FiPackage />, blog: <FiEdit3 />,
-  orders: <FiShoppingCart />, coupons: <FiTag />, shipping: <FiTruck />, bank: <FiCreditCard />,
+  orders: <FiShoppingCart />, coupons: <FiTag />, shipping: <FiTruck />, bank: <FiCreditCard />, mp: <FiDollarSign />,
 };
 
 export default function AdminLayout() {

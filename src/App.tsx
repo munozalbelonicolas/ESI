@@ -30,6 +30,7 @@ import AdminOrdersPage from './pages/admin/AdminOrdersPage';
 import AdminCouponsPage from './pages/admin/AdminCouponsPage';
 import AdminShippingPage from './pages/admin/AdminShippingPage';
 import AdminBankPage from './pages/admin/AdminBankPage';
+import AdminMercadoPagoPage from './pages/admin/AdminMercadoPagoPage';
 
 function PublicLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -96,6 +97,7 @@ export default function App() {
               <Route path="cupones" element={<AdminCouponsPage />} />
               <Route path="envios" element={<AdminShippingPage />} />
               <Route path="banco" element={<AdminBankPage />} />
+              <Route path="mercadopago" element={<AdminMercadoPagoPage />} />
             </Route>
 
             {/* 404 */}
