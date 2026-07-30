@@ -73,18 +73,24 @@
 .profile-badge {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 4px 12px;
+  padding: 6px 16px;
   border-radius: 20px;
   font-size: 0.85rem;
   font-weight: 600;
   background: #f0fdf4;
   color: #166534;
   border: 1px solid #bbf7d0;
-  margin-top: 4px;
+  margin-top: 8px;
+  width: fit-content;
+  max-width: max-content;
+  height: auto;
+  min-height: unset;
+  align-self: center;
 }
 
-.profile-badge.admin {
+.profile-badge--admin {
   background: #fef2f2;
   color: #991b1b;
   border-color: #fecaca;

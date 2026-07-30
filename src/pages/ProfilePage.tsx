@@ -102,7 +102,7 @@ export default function ProfilePage() {
             />
           </div>
           <h2>{displayName || 'Mi Perfil'}</h2>
-          <span className={`profile-badge ${profile?.role === 'admin' ? 'admin' : ''}`}>
+          <span className={`profile-badge ${profile?.role === 'admin' ? 'profile-badge--admin' : ''}`}>
             <FiShield /> {profile?.role === 'admin' ? 'Administrador' : 'Cliente'}
           </span>
           {uploadingAvatar && <p className="avatar-upload-status">Subiendo imagen a Cloudinary...</p>}
