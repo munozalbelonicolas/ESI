@@ -8,13 +8,13 @@
 /* ── CSS Custom Properties ── */
 :root {
   /* Paleta principal */
-  --color-primary: #FFE164;
-  --color-primary-dark: #E6C84A;
-  --color-primary-light: #FFF0A0;
-  --color-secondary: #6B2D7B;
-  --color-secondary-dark: #52205F;
-  --color-secondary-light: #8E4BA0;
-  --color-accent: #F5C518;
+  --color-primary: #ffe406;
+  --color-primary-dark: #e0c800;
+  --color-primary-light: #fff275;
+  --color-secondary: #690477;
+  --color-secondary-dark: #4d0258;
+  --color-secondary-light: #8900aa;
+  --color-accent: #ffe406;
 
   /* Textos */
   --color-text: #1A1A1A;

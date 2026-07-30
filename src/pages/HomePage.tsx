@@ -81,8 +81,8 @@ export default function HomePage() {
               <div className="value-prop__icon">
                 <FiHeart size={32} />
               </div>
-              <h3>Enfoque inclusivo</h3>
-              <p>Todos nuestros materiales respetan la diversidad y promueven el respeto, la empatía y los derechos.</p>
+              <h3>Enfoque pedagógico</h3>
+              <p>Creamos materiales que convierten la ESI en experiencias de enseñanza significativas, promoviendo el pensamiento crítico, la participación, la convivencia democrática y el ejercicio de los derechos.</p>
             </div>
             <div className="value-prop animate-slide-up" style={{ animationDelay: '200ms' }}>
               <div className="value-prop__icon">

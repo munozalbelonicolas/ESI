@@ -6,8 +6,8 @@ Sitio web oficial y tienda e-commerce para la marca **ESI en Secundaria**, enfoc
 
 ## 🎨 Identidad Visual
 - **Marca**: ESI en Secundaria
-- **Color primario**: Amarillo cálido (`#FFE164`)
-- **Color secundario**: Púrpura profesional (`#6B2D7B`)
+- **Color primario**: Amarillo vibrante (`#ffe406`)
+- **Color secundario**: Púrpura/Violeta (`#690477`)
 - **Tipografía de títulos**: *Asap Condensed*
 - **Tipografía de cuerpo**: *Balsamiq Sans*
 - **Tono de voz**: Cálido, cercano, profesional y enfocado en docentes.
