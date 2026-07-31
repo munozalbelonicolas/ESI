@@ -57,5 +57,11 @@ service cloud.firestore {
       // Solo admins pueden escribir
       allow create, update, delete: if isAdmin();
     }
+
+    // ── Settings (Datos bancarios, Envíos, Configuración de Mercado Pago) ──
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
   }
 }

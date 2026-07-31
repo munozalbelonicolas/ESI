@@ -8,7 +8,7 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { MercadoPagoConfig, Payment } from 'mercadopago-sdk-node';
+import { MercadoPagoConfig, Payment } from 'mercadopago';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 

@@ -59,22 +59,54 @@ export async function getOrderById(id: string): Promise<Order | null> {
  * Obtiene todas las órdenes de un usuario.
  */
 export async function getUserOrders(userId: string): Promise<Order[]> {
-  const q = query(
-    collection(db, COLLECTION),
-    where('userId', '==', userId),
-    orderBy('createdAt', 'desc')
-  );
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Order);
+  try {
+    const q = query(
+      collection(db, COLLECTION),
+      where('userId', '==', userId),
+      orderBy('createdAt', 'desc')
+    );
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Order);
+  } catch (err: any) {
+    console.warn('[orderService] Falta índice compuesto en Firestore, usando fallback en memoria:', err?.message || err);
+    try {
+      const qFallback = query(collection(db, COLLECTION), where('userId', '==', userId));
+      const snap = await getDocs(qFallback);
+      const orders = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Order);
+      return orders.sort((a, b) => {
+        const timeA = (a.createdAt as any)?.seconds || 0;
+        const timeB = (b.createdAt as any)?.seconds || 0;
+        return timeB - timeA;
+      });
+    } catch (fallbackErr) {
+      console.error('[orderService] Error al obtener órdenes:', fallbackErr);
+      return [];
+    }
+  }
 }
 
 /**
  * Obtiene todas las órdenes (admin).
  */
 export async function getAllOrders(): Promise<Order[]> {
-  const q = query(collection(db, COLLECTION), orderBy('createdAt', 'desc'));
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Order);
+  try {
+    const q = query(collection(db, COLLECTION), orderBy('createdAt', 'desc'));
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Order);
+  } catch (err) {
+    console.warn('[orderService] Error obteniendo todas las órdenes, fallback:', err);
+    try {
+      const snap = await getDocs(collection(db, COLLECTION));
+      const orders = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Order);
+      return orders.sort((a, b) => {
+        const timeA = (a.createdAt as any)?.seconds || 0;
+        const timeB = (b.createdAt as any)?.seconds || 0;
+        return timeB - timeA;
+      });
+    } catch {
+      return [];
+    }
+  }
 }
 
 /**

@@ -98,7 +98,24 @@ export async function getProducts(
     }
     return result;
   } catch (err) {
-    console.warn('[productService] Firestore no disponible, usando datos de muestra:', err);
+    console.warn('[productService] Falta índice en Firestore, intentando consulta alternativa:', err);
+    try {
+      let qAlt = query(collection(db, COLLECTION), where('isActive', '==', true));
+      if (category) {
+        qAlt = query(collection(db, COLLECTION), where('isActive', '==', true), where('category', '==', category));
+      }
+      const snapAlt = await getDocs(qAlt);
+      if (!snapAlt.empty) {
+        const prodsAlt = snapAlt.docs.map((d) => ({ id: d.id, ...d.data() }) as Product);
+        prodsAlt.sort((a, b) => ((b.createdAt as any)?.seconds || 0) - ((a.createdAt as any)?.seconds || 0));
+        const resAlt = { products: prodsAlt.slice(0, PAGE_SIZE), lastVisible: null };
+        if (!lastDoc) productsCache.set(cacheKey, { timestamp: Date.now(), data: resAlt });
+        return resAlt;
+      }
+    } catch {
+      // continuar a muestra
+    }
+
     const filtered = category
       ? FALLBACK_PRODUCTS.filter((p) => p.category === category)
       : FALLBACK_PRODUCTS;

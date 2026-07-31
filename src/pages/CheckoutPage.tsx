@@ -126,10 +126,18 @@ export default function CheckoutPage() {
             firebaseUser.email || '',
             shippingCost, discount
           );
-          window.location.href = pref.initPoint;
+          const redirectUrl = pref.initPoint || pref.sandboxInitPoint;
+          if (redirectUrl) {
+            clearCart();
+            window.location.href = redirectUrl;
+            return;
+          }
+          throw new Error('No se obtuvo la URL de pago de Mercado Pago.');
+        } catch (mpErr: any) {
+          console.error('[Checkout] Error conectando con Mercado Pago:', mpErr);
+          toast.error(mpErr.message || 'Error al conectar con Mercado Pago. Intentá de nuevo.');
+          setProcessing(false);
           return;
-        } catch {
-          toast.error('Error al conectar con Mercado Pago. Tu orden fue creada con pago pendiente.');
         }
       }
 
