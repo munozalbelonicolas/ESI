@@ -1,5 +1,3 @@
-import esiLogo from '../assets/logo.svg';
-
 export const SITE_CONFIG = {
   name: 'ESI en Secundaria',
   tagline: 'Recursos de Educación Sexual Integral para nivel secundario',
@@ -7,7 +5,7 @@ export const SITE_CONFIG = {
     'Materiales, cuadernillos, juegos y recursos didácticos de ESI para docentes de secundaria. Todo lo que necesitás para abordar la ESI en el aula con seguridad y profesionalismo.',
   email: 'esiensecundaria@gmail.com',
   whatsappNumber: import.meta.env.VITE_WHATSAPP_NUMBER || '5491100000000',
-  logo: esiLogo,
+  logo: '/logo.webp',
   socialMedia: {
     instagram: 'https://www.instagram.com/esiensecundaria/',
     facebook: '',

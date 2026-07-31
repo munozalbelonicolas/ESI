@@ -8,7 +8,7 @@ import { getShippingQuotes, type ShippingQuote } from '../services/shippingServi
 import { getBankDetails, type BankDetails } from '../services/bankService';
 import { uploadTransferProof } from '../services/storageService';
 import { saveTransferProof } from '../services/orderService';
-import { createMPPreference } from '../services/paymentService';
+import { createMPPreference, sendPurchaseConfirmation } from '../services/paymentService';
 import { formatPrice } from '../utils/formatPrice';
 import { trackBeginCheckout, trackPurchase } from '../config/analytics';
 import { onPurchaseComplete } from '../services/subscriptionHook';
@@ -135,6 +135,16 @@ export default function CheckoutPage() {
 
       trackPurchase(orderId, total, items.map(i => ({ item_id: i.product.id, item_name: i.product.name, price: i.product.price, quantity: i.quantity })), paymentMethod);
       await onPurchaseComplete({ userId: firebaseUser.uid, email: firebaseUser.email || '', type: 'purchase', productIds: items.map(i => i.product.id), timestamp: new Date() });
+
+      // Enviar email de confirmación al cliente (y copia al admin)
+      await sendPurchaseConfirmation({
+        orderId,
+        userEmail: firebaseUser.email || '',
+        userName: profile?.displayName || '',
+        items: items.map(i => ({ productId: i.product.id, name: i.product.name, price: i.product.price, quantity: i.quantity, isDigital: i.product.isDigital, image: i.product.images[0] || '' })),
+        total,
+        paymentMethod,
+      });
 
       clearCart();
       navigate(`/checkout/exito?order=${orderId}`);
