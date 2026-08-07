@@ -145,7 +145,7 @@ export default function AdminProductsPage() {
               <label className="form-label">Descripción completa (HTML)</label>
               <textarea className="form-textarea" value={form.description} onChange={e => update('description', e.target.value)} rows={6} />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 16 }}>
+            <div className="admin-form-row admin-form-row--4">
               <div className="form-group">
                 <label className="form-label">Precio ($)</label>
                 <input className="form-input" type="number" value={form.price} onChange={e => update('price', Number(e.target.value))} min={0} />
@@ -163,7 +163,7 @@ export default function AdminProductsPage() {
                 <input className="form-input" type="number" value={form.stock} onChange={e => update('stock', Number(e.target.value))} />
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div className="admin-form-row admin-form-row--2">
               <div className="form-group">
                 <label className="form-label">Categoría</label>
                 <select className="form-select" value={form.category} onChange={e => update('category', e.target.value)}>
@@ -220,7 +220,7 @@ export default function AdminProductsPage() {
                 <h4 style={{ margin: '0 0 12px 0', fontSize: 'var(--text-sm)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
                   📦 Configuración de Envío Correo Argentino (Producto Físico)
                 </h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div className="admin-form-row admin-form-row--2">
                   <div className="form-group" style={{ margin: 0 }}>
                     <label className="form-label">Peso unitario (gramos)</label>
                     <input
