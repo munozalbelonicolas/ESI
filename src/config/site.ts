@@ -4,7 +4,7 @@ export const SITE_CONFIG = {
   description:
     'Materiales, cuadernillos, juegos y recursos didácticos de ESI para docentes de secundaria. Todo lo que necesitás para abordar la ESI en el aula con seguridad y profesionalismo.',
   email: 'esiensecundaria@gmail.com',
-  whatsappNumber: import.meta.env.VITE_WHATSAPP_NUMBER || '5491100000000',
+  whatsappNumber: import.meta.env.VITE_WHATSAPP_NUMBER || '5491150362832',
   logo: '/ESI LOGO.webp',
   socialMedia: {
     instagram: 'https://www.instagram.com/esiensecundaria/',
