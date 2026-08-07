@@ -95,16 +95,13 @@ export default defineConfig(({ mode }) => {
                   payer: { email },
                   metadata: { orderId: orderId || '' },
                   back_urls: {
-                    success: `${baseUrl}/checkout/exito`,
+                    success: `${baseUrl}/checkout/exito?order=${orderId}`,
                     failure: `${baseUrl}/carrito`,
                     pending: `${baseUrl}/mis-ordenes`,
                   },
+                  auto_return: 'approved',
                   statement_descriptor: 'ESI Secundaria',
                 };
-
-                if (!isLocalhost) {
-                  prefBody.auto_return = 'approved';
-                }
 
                 const result = await preferenceClient.create({
                   body: prefBody,

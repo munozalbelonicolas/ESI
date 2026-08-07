@@ -111,15 +111,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         orderId: orderId || '',
       },
       back_urls: {
-        success: `${baseUrl}/checkout/exito`,
+        success: `${baseUrl}/checkout/exito?order=${orderId}`,
         failure: `${baseUrl}/carrito`,
         pending: `${baseUrl}/mis-ordenes`,
       },
+      auto_return: 'approved',
       statement_descriptor: 'ESI Secundaria',
     };
 
     if (!isLocalhost) {
-      preferenceData.auto_return = 'approved';
       preferenceData.notification_url = `${baseUrl}/api/mp-webhook`;
     }
 
