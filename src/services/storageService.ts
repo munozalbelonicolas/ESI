@@ -31,29 +31,6 @@ export async function uploadToCloudinary(
   file: File,
   _folder: 'products' | 'transfer-proofs' | 'blog' = 'products'
 ): Promise<string> {
-  // Si Cloudinary está configurado correctamente con credenciales válidas
-  if (CLOUD_NAME && UPLOAD_PRESET && CLOUD_NAME !== 'your_cloud_name') {
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('upload_preset', UPLOAD_PRESET);
-      formData.append('folder', `esi_secundaria/${_folder}`);
-
-      const res = await fetch(
-        `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
-        { method: 'POST', body: formData }
-      );
-
-      if (res.ok) {
-        const data = await res.json();
-        return data.secure_url;
-      }
-    } catch {
-      // Ignorar fallo y usar Base64
-    }
-  }
-
-  // Fallback por defecto: Base64 directo (no requiere cuentas externas)
   return fileToBase64(file);
 }
 
