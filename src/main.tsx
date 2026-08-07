@@ -7,12 +7,10 @@ import './index.css';
 // Inicializar Google Analytics
 initAnalytics();
 
-// Registrar Service Worker para PWA
+// Desregistrar cualquier Service Worker existente (evita interferencias con el admin y APIs)
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {
-      // SW registration failed silently
-    });
+  navigator.serviceWorker.getRegistrations().then((regs) => {
+    regs.forEach((r) => r.unregister());
   });
 }
 

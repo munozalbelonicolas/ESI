@@ -1,5 +1,5 @@
 // Service Worker — PWA cache básico
-const CACHE_NAME = 'esi-v1';
+const CACHE_NAME = 'esi-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -23,13 +23,29 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Network first, fallback to cache
-  if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
+
+  // No cachear: rutas del admin, APIs, Firebase, Firestore ni peticiones POST/PUT/DELETE
+  if (
+    event.request.method !== 'GET' ||
+    url.pathname.startsWith('/admin') ||
+    url.pathname.startsWith('/api/') ||
+    url.hostname.includes('firestore.googleapis.com') ||
+    url.hostname.includes('firebase') ||
+    url.hostname.includes('googleapis.com') ||
+    url.hostname.includes('mercadopago')
+  ) {
+    return;
+  }
+
+  // Network first, fallback to cache para el resto
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        if (response && response.status === 200) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
         return response;
       })
       .catch(() => caches.match(event.request))
