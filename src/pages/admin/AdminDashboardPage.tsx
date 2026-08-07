@@ -28,15 +28,17 @@ export default function AdminDashboard() {
 
   if (loading) return <div className="page-loader"><div className="spinner" /></div>;
 
-  const totalRevenue = orders.filter(o => o.paymentStatus === 'approved').reduce((sum, o) => sum + o.total, 0);
+  const isPaid = (o: Order) => o.paymentStatus === 'approved' || o.status === 'paid';
+
+  const totalRevenue = orders.filter(isPaid).reduce((sum, o) => sum + o.total, 0);
   const totalOrders = orders.length;
-  const paidOrders = orders.filter(o => o.paymentStatus === 'approved').length;
+  const paidOrders = orders.filter(isPaid).length;
   const lowStockProducts = products.filter(p => !p.isDigital && p.stock >= 0 && p.stock <= SITE_CONFIG.lowStockThreshold);
 
   // Gráfico de ventas por mes
   const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
   const salesByMonth = new Array(12).fill(0);
-  orders.filter(o => o.paymentStatus === 'approved').forEach(o => {
+  orders.filter(isPaid).forEach(o => {
     const month = o.createdAt?.toDate?.()?.getMonth?.() ?? 0;
     salesByMonth[month] += o.total;
   });
