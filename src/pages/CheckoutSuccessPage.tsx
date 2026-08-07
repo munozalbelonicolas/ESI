@@ -1,9 +1,22 @@
+import { useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { FiCheckCircle } from 'react-icons/fi';
+import { updateOrderStatus, updatePaymentStatus } from '../services/orderService';
 
 export default function CheckoutSuccessPage() {
   const [params] = useSearchParams();
-  const orderId = params.get('order');
+  const orderId = params.get('order') || params.get('external_reference');
+  const collectionStatus = params.get('collection_status') || params.get('status');
+
+  useEffect(() => {
+    // Si Mercado Pago redirige de vuelta con status approved o la orden viene especificada
+    if (orderId) {
+      if (!collectionStatus || collectionStatus === 'approved') {
+        updateOrderStatus(orderId, 'paid').catch(() => {});
+        updatePaymentStatus(orderId, 'approved').catch(() => {});
+      }
+    }
+  }, [orderId, collectionStatus]);
 
   return (
     <div className="section" style={{ textAlign: 'center', minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
