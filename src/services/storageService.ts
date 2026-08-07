@@ -39,27 +39,33 @@ export async function uploadToCloudinary(
     return fileToBase64(file);
   }
 
-  const targetFolder = `esi_secundaria/${folder}`;
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('upload_preset', UPLOAD_PRESET);
-  formData.append('folder', targetFolder);
+  try {
+    const targetFolder = `esi_secundaria/${folder}`;
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', UPLOAD_PRESET);
+    formData.append('folder', targetFolder);
 
-  const res = await fetch(
-    `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
-    {
-      method: 'POST',
-      body: formData,
+    const res = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+      {
+        method: 'POST',
+        body: formData,
+      }
+    );
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.warn('[Cloudinary] Error en respuesta de Cloudinary, usando fallback Base64:', err.error?.message || res.statusText);
+      return fileToBase64(file);
     }
-  );
 
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error?.message || 'Error al subir imagen a Cloudinary');
+    const data = await res.json();
+    return data.secure_url;
+  } catch (err: any) {
+    console.warn('[Cloudinary] Excepción subiendo imagen, usando fallback Base64:', err?.message || err);
+    return fileToBase64(file);
   }
-
-  const data = await res.json();
-  return data.secure_url;
 }
 
 /**
