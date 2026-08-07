@@ -29,43 +29,32 @@ function fileToBase64(file: File): Promise<string> {
  */
 export async function uploadToCloudinary(
   file: File,
-  folder: 'products' | 'transfer-proofs' | 'blog' = 'products'
+  _folder: 'products' | 'transfer-proofs' | 'blog' = 'products'
 ): Promise<string> {
-  // Si no hay Cloud Name o Upload Preset configurados, usar fallback Base64
-  if (!CLOUD_NAME || !UPLOAD_PRESET || CLOUD_NAME === 'your_cloud_name') {
-    console.warn(
-      `[Cloudinary] VITE_CLOUDINARY_CLOUD_NAME o VITE_CLOUDINARY_UPLOAD_PRESET no configurados. Usando Base64 DataURL.`
-    );
-    return fileToBase64(file);
-  }
+  // Si Cloudinary está configurado correctamente con credenciales válidas
+  if (CLOUD_NAME && UPLOAD_PRESET && CLOUD_NAME !== 'your_cloud_name') {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', UPLOAD_PRESET);
+      formData.append('folder', `esi_secundaria/${_folder}`);
 
-  try {
-    const targetFolder = `esi_secundaria/${folder}`;
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('upload_preset', UPLOAD_PRESET);
-    formData.append('folder', targetFolder);
+      const res = await fetch(
+        `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+        { method: 'POST', body: formData }
+      );
 
-    const res = await fetch(
-      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
-      {
-        method: 'POST',
-        body: formData,
+      if (res.ok) {
+        const data = await res.json();
+        return data.secure_url;
       }
-    );
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      console.warn('[Cloudinary] Error en respuesta de Cloudinary, usando fallback Base64:', err.error?.message || res.statusText);
-      return fileToBase64(file);
+    } catch {
+      // Ignorar fallo y usar Base64
     }
-
-    const data = await res.json();
-    return data.secure_url;
-  } catch (err: any) {
-    console.warn('[Cloudinary] Excepción subiendo imagen, usando fallback Base64:', err?.message || err);
-    return fileToBase64(file);
   }
+
+  // Fallback por defecto: Base64 directo (no requiere cuentas externas)
+  return fileToBase64(file);
 }
 
 /**
