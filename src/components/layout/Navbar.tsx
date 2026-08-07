@@ -9,13 +9,14 @@ import './Navbar.css';
 
 export default function Navbar() {
   const { firebaseUser, isAdmin, profile } = useAuthContext();
-  const { getItemCount } = useCartContext();
+  const { getItemCount, clearCart } = useCartContext();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const location = useLocation();
   const itemCount = getItemCount();
 
   const handleLogout = async () => {
+    clearCart();
     await logoutUser();
     setUserMenuOpen(false);
   };

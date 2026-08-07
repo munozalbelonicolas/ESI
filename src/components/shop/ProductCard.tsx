@@ -71,18 +71,31 @@ export default function ProductCard({ product, priority = false }: Props) {
             {product.transferDiscountPercent}% OFF con Transferencia
           </div>
         )}
-        <button
-          className={`product-card__btn btn ${alreadyInCart ? 'btn--ghost' : 'btn--primary'} btn--sm btn--full`}
-          onClick={handleAddToCart}
-          disabled={isOutOfStock}
-        >
-          {isOutOfStock ? 'Sin stock' : alreadyInCart ? 'Ya en el carrito' : (
-            <>
-              {product.isDigital ? <FiDownload size={16} /> : <FiShoppingBag size={16} />}
-              {product.isFree ? 'Obtener gratis' : 'Agregar al carrito'}
-            </>
-          )}
-        </button>
+        {product.isFree && product.digitalFileUrl ? (
+          <a
+            href={product.digitalFileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="product-card__btn btn btn--primary btn--sm btn--full"
+            onClick={e => e.stopPropagation()}
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+          >
+            <FiDownload size={16} /> Descargar gratis
+          </a>
+        ) : (
+          <button
+            className={`product-card__btn btn ${alreadyInCart ? 'btn--ghost' : 'btn--primary'} btn--sm btn--full`}
+            onClick={handleAddToCart}
+            disabled={isOutOfStock}
+          >
+            {isOutOfStock ? 'Sin stock' : alreadyInCart ? 'Ya en el carrito' : (
+              <>
+                {product.isDigital ? <FiDownload size={16} /> : <FiShoppingBag size={16} />}
+                {product.isFree ? 'Obtener gratis' : 'Agregar al carrito'}
+              </>
+            )}
+          </button>
+        )}
       </div>
     </Link>
   );

@@ -226,6 +226,26 @@ export default function AdminProductsPage() {
               </label>
             </div>
 
+            {(form.isDigital || form.isFree) && (
+              <div style={{ background: '#f0fdf4', padding: 16, borderRadius: 8, marginBottom: 16, border: '1px solid #86efac' }}>
+                <h4 style={{ margin: '0 0 10px 0', fontSize: 'var(--text-sm)', color: '#15803d', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  🔗 Link de descarga (Google Drive u otro)
+                </h4>
+                <input
+                  className="form-input"
+                  type="url"
+                  value={form.digitalFileUrl || ''}
+                  onChange={e => update('digitalFileUrl', e.target.value || null)}
+                  placeholder="https://drive.google.com/file/d/..."
+                />
+                <span style={{ fontSize: 'var(--text-xs)', color: '#166534', marginTop: 4, display: 'block' }}>
+                  {form.isFree
+                    ? '📢 Este link será visible de inmediato en la página del producto (es gratuito).'
+                    : '🔒 Este link solo será visible al comprador cuando el pago sea aprobado.'}
+                </span>
+              </div>
+            )}
+
             {!form.isDigital && (
               <div style={{ background: 'var(--color-bg-alt)', padding: 16, borderRadius: 8, marginBottom: 16, border: '1px solid var(--color-border)' }}>
                 <h4 style={{ margin: '0 0 12px 0', fontSize: 'var(--text-sm)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>

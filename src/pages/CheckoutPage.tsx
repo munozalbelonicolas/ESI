@@ -104,6 +104,7 @@ export default function CheckoutPage() {
         items: items.map(i => ({
           productId: i.product.id, name: i.product.name, price: i.product.price,
           quantity: i.quantity, isDigital: i.product.isDigital, image: i.product.images[0] || '',
+          downloadUrl: i.product.isDigital ? (i.product.digitalFileUrl || null) : null,
         })),
         subtotal, discount, couponCode: appliedCoupon?.code || null,
         shippingCost, shippingMethod: selectedShipping?.name || 'Digital',

@@ -136,9 +136,9 @@ export default function ProductPage() {
               </div>
             )}
 
-            {product.isDigital && (
+            {product.isDigital && !product.isFree && (
               <p className="product-page__digital-note" style={{ marginTop: 12 }}>
-                <FiDownload /> Producto digital — se envía por email después de la compra
+                <FiDownload /> Producto digital — recibirás el link de descarga una vez aprobado el pago
               </p>
             )}
 
@@ -149,22 +149,37 @@ export default function ProductPage() {
             <p className="product-page__short-desc">{product.shortDescription}</p>
 
             <div className="product-page__actions">
-              {!product.isFree && !isOutOfStock && (
-                <div className="product-page__quantity">
-                  <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="product-page__qty-btn"><FiMinus /></button>
-                  <span className="product-page__qty-value">{quantity}</span>
-                  <button onClick={() => setQuantity(quantity + 1)} className="product-page__qty-btn"><FiPlus /></button>
-                </div>
+              {/* Producto gratuito CON link: botón de descarga directa */}
+              {product.isFree && product.digitalFileUrl ? (
+                <a
+                  href={product.digitalFileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn--primary btn--lg btn--full"
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                >
+                  <FiDownload /> Descargar gratis
+                </a>
+              ) : (
+                <>
+                  {!product.isFree && !isOutOfStock && (
+                    <div className="product-page__quantity">
+                      <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="product-page__qty-btn"><FiMinus /></button>
+                      <span className="product-page__qty-value">{quantity}</span>
+                      <button onClick={() => setQuantity(quantity + 1)} className="product-page__qty-btn"><FiPlus /></button>
+                    </div>
+                  )}
+                  <button
+                    className={`btn ${alreadyInCart ? 'btn--ghost' : 'btn--primary'} btn--lg btn--full`}
+                    onClick={handleAdd}
+                    disabled={isOutOfStock}
+                  >
+                    {isOutOfStock ? 'Sin stock' : alreadyInCart ? '✓ Ya está en el carrito' : (
+                      <>{product.isDigital ? <FiDownload /> : <FiShoppingBag />} {product.isFree ? 'Obtener gratis' : 'Agregar al carrito'}</>
+                    )}
+                  </button>
+                </>
               )}
-              <button
-                className={`btn ${alreadyInCart ? 'btn--ghost' : 'btn--primary'} btn--lg btn--full`}
-                onClick={handleAdd}
-                disabled={isOutOfStock}
-              >
-                {isOutOfStock ? 'Sin stock' : alreadyInCart ? '✓ Ya está en el carrito' : (
-                  <>{product.isDigital ? <FiDownload /> : <FiShoppingBag />} {product.isFree ? 'Obtener gratis' : 'Agregar al carrito'}</>
-                )}
-              </button>
             </div>
 
             {!product.isDigital && (

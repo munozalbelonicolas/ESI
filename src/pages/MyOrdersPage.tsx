@@ -6,7 +6,7 @@ import { formatPrice } from '../utils/formatPrice';
 import { formatDateShort } from '../utils/formatDate';
 import { ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS } from '../types/order';
 import type { Order } from '../types/order';
-import { FiPackage, FiCreditCard, FiArrowRight, FiTrash2 } from 'react-icons/fi';
+import { FiPackage, FiCreditCard, FiArrowRight, FiTrash2, FiDownload } from 'react-icons/fi';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
@@ -139,21 +139,39 @@ export default function MyOrdersPage() {
                     </div>
                   </div>
 
+                  {/* Items del pedido */}
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
-                    {o.items.map((item, i) => (
-                      <span
-                        key={i}
-                        style={{
-                          fontSize: 'var(--text-sm)',
-                          background: 'var(--color-bg-alt)',
-                          padding: '4px 10px',
-                          borderRadius: 20,
-                          color: 'var(--color-text)',
-                        }}
-                      >
-                        {item.name} x{item.quantity}
-                      </span>
-                    ))}
+                    {o.items.map((item, i) => {
+                      const isPaid = o.paymentStatus === 'approved' || o.status === 'paid';
+                      const showDownload = item.isDigital && item.downloadUrl && isPaid;
+                      return (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span
+                            style={{
+                              fontSize: 'var(--text-sm)',
+                              background: 'var(--color-bg-alt)',
+                              padding: '4px 10px',
+                              borderRadius: 20,
+                              color: 'var(--color-text)',
+                            }}
+                          >
+                            {item.name} x{item.quantity}
+                          </span>
+                          {showDownload && (
+                            <a
+                              href={item.downloadUrl!}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn btn--primary btn--sm"
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', fontSize: 'var(--text-xs)' }}
+                              title={`Descargar ${item.name}`}
+                            >
+                              <FiDownload size={13} /> Descargar
+                            </a>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
 
                   <div
