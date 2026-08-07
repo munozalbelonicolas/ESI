@@ -208,7 +208,18 @@ export default function AdminProductsPage() {
                 <input type="checkbox" checked={form.isFree} onChange={e => update('isFree', e.target.checked)} /> Gratis
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                <input type="checkbox" checked={form.isDigital} onChange={e => update('isDigital', e.target.checked)} /> Digital
+                <input
+                  type="checkbox"
+                  checked={form.isDigital}
+                  onChange={e => {
+                    const digital = e.target.checked;
+                    setForm(prev => ({
+                      ...prev,
+                      isDigital: digital,
+                      stock: digital ? -1 : (prev.stock === -1 ? 10 : prev.stock)
+                    }));
+                  }}
+                /> Digital
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
                 <input type="checkbox" checked={form.isActive} onChange={e => update('isActive', e.target.checked)} /> Activo
