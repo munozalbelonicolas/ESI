@@ -17,6 +17,9 @@ export default function AdminOrdersPage() {
 
   const handleStatusChange = async (orderId: string, status: OrderStatus) => {
     await updateOrderStatus(orderId, status);
+    if (status === 'paid') {
+      await updatePaymentStatus(orderId, 'approved');
+    }
     toast.success('Estado actualizado');
     loadOrders();
   };
