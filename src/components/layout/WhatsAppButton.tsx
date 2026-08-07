@@ -8,9 +8,11 @@ export default function WhatsAppButton() {
     trackWhatsAppClick(window.location.pathname);
   };
 
+  const message = encodeURIComponent('¡Hola! Vengo desde la web de ESI en Secundaria y quisiera hacer una consulta.');
+
   return (
     <a
-      href={`https://wa.me/${SITE_CONFIG.whatsappNumber}?text=Hola!%20Quiero%20consultar%20sobre%20los%20recursos%20de%20ESI%20en%20Secundaria`}
+      href={`https://wa.me/${SITE_CONFIG.whatsappNumber}?text=${message}`}
       target="_blank"
       rel="noopener noreferrer"
       className="whatsapp-btn"
