@@ -134,8 +134,16 @@ export async function getAllProducts(): Promise<Product[]> {
     const snap = await getDocs(q);
     if (snap.empty) return FALLBACK_PRODUCTS;
     return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Product);
-  } catch {
-    return FALLBACK_PRODUCTS;
+  } catch (err) {
+    console.warn('[productService] Error en getAllProducts ordenado, probando consulta simple:', err);
+    try {
+      const snap = await getDocs(collection(db, COLLECTION));
+      if (snap.empty) return FALLBACK_PRODUCTS;
+      const prods = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Product);
+      return prods.sort((a, b) => ((b.createdAt as any)?.seconds || 0) - ((a.createdAt as any)?.seconds || 0));
+    } catch {
+      return FALLBACK_PRODUCTS;
+    }
   }
 }
 
