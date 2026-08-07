@@ -46,8 +46,7 @@ service cloud.firestore {
       // Un usuario autenticado puede crear su propia orden
       allow create: if isAuth() && request.resource.data.userId == request.auth.uid;
       // Solo admin puede actualizar (cambiar estados)
-      allow update: if isAuth() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow delete: if isAdmin();
+      allow delete: if isAuth() && (resource.data.userId == request.auth.uid || isAdmin());
     }
 
     // ── Coupons ──

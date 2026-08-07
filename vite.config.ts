@@ -86,23 +86,28 @@ export default defineConfig(({ mode }) => {
 
                 const rawSiteUrl = env.VITE_SITE_URL || '';
                 const isLocalhost = !rawSiteUrl || rawSiteUrl.includes('localhost') || rawSiteUrl.includes('127.0.0.1');
-                const siteUrl = isLocalhost ? 'https://esiensecundaria.com.ar' : rawSiteUrl;
+                const baseUrl = isLocalhost ? 'http://localhost:5173' : rawSiteUrl;
 
                 const preferenceClient = new Preference(mp);
 
-                const result = await preferenceClient.create({
-                  body: {
-                    items: mpItems,
-                    payer: { email },
-                    metadata: { orderId: orderId || '' },
-                    back_urls: {
-                      success: `${siteUrl}/checkout/exito`,
-                      failure: `${siteUrl}/carrito`,
-                      pending: `${siteUrl}/mis-ordenes`,
-                    },
-                    auto_return: 'approved',
-                    statement_descriptor: 'ESI Secundaria',
+                const prefBody: any = {
+                  items: mpItems,
+                  payer: { email },
+                  metadata: { orderId: orderId || '' },
+                  back_urls: {
+                    success: `${baseUrl}/checkout/exito`,
+                    failure: `${baseUrl}/carrito`,
+                    pending: `${baseUrl}/mis-ordenes`,
                   },
+                  statement_descriptor: 'ESI Secundaria',
+                };
+
+                if (!isLocalhost) {
+                  prefBody.auto_return = 'approved';
+                }
+
+                const result = await preferenceClient.create({
+                  body: prefBody,
                 });
 
                 res.statusCode = 200;

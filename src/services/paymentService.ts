@@ -57,7 +57,8 @@ export async function createMPPreference(
   });
 
   if (!res.ok) {
-    throw new Error('Error al crear preferencia de Mercado Pago');
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || errorData.error || 'Error al crear preferencia de Mercado Pago');
   }
 
   return res.json();

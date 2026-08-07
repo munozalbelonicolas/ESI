@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useAuthContext } from '../context/AuthContext';
-import { getUserOrders } from '../services/orderService';
+import { getUserOrders, deleteOrder } from '../services/orderService';
 import { createMPPreference } from '../services/paymentService';
 import { formatPrice } from '../utils/formatPrice';
 import { formatDateShort } from '../utils/formatDate';
 import { ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS } from '../types/order';
 import type { Order } from '../types/order';
-import { FiPackage, FiCreditCard, FiArrowRight } from 'react-icons/fi';
+import { FiPackage, FiCreditCard, FiArrowRight, FiTrash2 } from 'react-icons/fi';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
@@ -15,11 +15,15 @@ export default function MyOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [payingId, setPayingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!firebaseUser) return;
     getUserOrders(firebaseUser.uid)
-      .then(setOrders)
+      .then((data) => {
+        const hidden: string[] = JSON.parse(localStorage.getItem('esi_hidden_orders') || '[]');
+        setOrders(data.filter((o) => !hidden.includes(o.id)));
+      })
       .finally(() => setLoading(false));
   }, [firebaseUser]);
 
@@ -45,6 +49,26 @@ export default function MyOrdersPage() {
       toast.error(err.message || 'Error al conectar con Mercado Pago. Intentá de nuevo.');
     } finally {
       setPayingId(null);
+    }
+  };
+
+  const handleDeleteOrder = async (orderId: string) => {
+    if (!window.confirm('¿Estás seguro de que querés eliminar esta compra?')) return;
+    setDeletingId(orderId);
+    try {
+      await deleteOrder(orderId);
+    } catch (err: any) {
+      console.warn('[MyOrdersPage] No se pudo borrar en Firestore, ocultando localmente:', err);
+    } finally {
+      // Guardar ID en localStorage para ocultarla siempre
+      const hidden: string[] = JSON.parse(localStorage.getItem('esi_hidden_orders') || '[]');
+      if (!hidden.includes(orderId)) {
+        hidden.push(orderId);
+        localStorage.setItem('esi_hidden_orders', JSON.stringify(hidden));
+      }
+      setOrders((prev) => prev.filter((o) => o.id !== orderId));
+      toast.success('Compra eliminada correctamente');
+      setDeletingId(null);
     }
   };
 
@@ -147,16 +171,35 @@ export default function MyOrdersPage() {
                       Total: {formatPrice(o.total)}
                     </div>
 
-                    {isPendingPayment && (
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
                       <button
-                        className="btn btn--primary btn--sm"
-                        onClick={() => handlePayOrder(o)}
-                        disabled={payingId === o.id}
-                        style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+                        className="btn btn--outline btn--sm"
+                        onClick={() => handleDeleteOrder(o.id)}
+                        disabled={deletingId === o.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          color: '#dc2626',
+                          borderColor: '#fca5a5',
+                          backgroundColor: '#fef2f2',
+                        }}
                       >
-                        {payingId === o.id ? 'Procesando...' : 'Finalizar compra'} <FiArrowRight size={16} />
+                        <FiTrash2 size={15} />
+                        {deletingId === o.id ? 'Eliminando...' : 'Eliminar compra'}
                       </button>
-                    )}
+
+                      {isPendingPayment && (
+                        <button
+                          className="btn btn--primary btn--sm"
+                          onClick={() => handlePayOrder(o)}
+                          disabled={payingId === o.id}
+                          style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+                        >
+                          {payingId === o.id ? 'Procesando...' : 'Finalizar compra'} <FiArrowRight size={16} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );

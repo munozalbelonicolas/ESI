@@ -5,6 +5,7 @@ import {
   getDoc,
   addDoc,
   updateDoc,
+  deleteDoc,
   query,
   where,
   orderBy,
@@ -150,4 +151,20 @@ export async function saveTransferProof(
     transferProofUrl: proofUrl,
     updatedAt: Timestamp.now(),
   });
+}
+
+/**
+ * Elimina una orden por ID (con fallback a cancelación si faltan permisos de borrado en Firestore).
+ */
+export async function deleteOrder(orderId: string): Promise<void> {
+  try {
+    await deleteDoc(doc(db, COLLECTION, orderId));
+  } catch (err: any) {
+    console.warn('[orderService] deleteDoc falló por permisos, cancelando la orden:', err?.message || err);
+    await updateDoc(doc(db, COLLECTION, orderId), {
+      status: 'cancelled',
+      paymentStatus: 'rejected',
+      updatedAt: Timestamp.now(),
+    });
+  }
 }

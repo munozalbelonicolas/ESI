@@ -100,7 +100,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const rawSiteUrl = process.env.VITE_SITE_URL || '';
     const isLocalhost = !rawSiteUrl || rawSiteUrl.includes('localhost') || rawSiteUrl.includes('127.0.0.1');
-    const siteUrl = isLocalhost ? 'https://esiensecundaria.com.ar' : rawSiteUrl;
+    const baseUrl = isLocalhost ? 'http://localhost:5173' : rawSiteUrl;
 
     const preferenceData: any = {
       items: mpItems,
@@ -111,16 +111,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         orderId: orderId || '',
       },
       back_urls: {
-        success: `${siteUrl}/checkout/exito`,
-        failure: `${siteUrl}/carrito`,
-        pending: `${siteUrl}/mis-ordenes`,
+        success: `${baseUrl}/checkout/exito`,
+        failure: `${baseUrl}/carrito`,
+        pending: `${baseUrl}/mis-ordenes`,
       },
-      auto_return: 'approved',
       statement_descriptor: 'ESI Secundaria',
     };
 
     if (!isLocalhost) {
-      preferenceData.notification_url = `${siteUrl}/api/mp-webhook`;
+      preferenceData.auto_return = 'approved';
+      preferenceData.notification_url = `${baseUrl}/api/mp-webhook`;
     }
 
     const preferenceClient = new Preference(mp);
