@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthContext } from '../context/AuthContext';
-import { updateUserProfile } from '../services/authService';
+import { updateUserProfile, changePassword } from '../services/authService';
 import { uploadToCloudinary } from '../services/storageService';
 import { PROVINCES } from '../config/site';
-import { FiCamera, FiUser, FiPhone, FiMail, FiShield, FiSave, FiLoader, FiTruck, FiMapPin } from 'react-icons/fi';
+import { FiCamera, FiUser, FiPhone, FiMail, FiShield, FiSave, FiLoader, FiTruck, FiMapPin, FiLock } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import './ProfilePage.css';
 
@@ -18,6 +18,11 @@ export default function ProfilePage() {
   const [zipCode, setZipCode] = useState('');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Estados para cambiar contraseña
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -90,6 +95,30 @@ export default function ProfilePage() {
       toast.error(err.message || 'Error al guardar los cambios');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleChangePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      toast.error('Las contraseñas no coinciden');
+      return;
+    }
+
+    try {
+      setChangingPassword(true);
+      await changePassword(newPassword);
+      toast.success('¡Contraseña actualizada correctamente!');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: any) {
+      console.error('Error al cambiar contraseña:', err);
+      const msg = err.code === 'auth/requires-recent-login'
+        ? 'Por seguridad, volvvé a iniciar sesión antes de cambiar tu contraseña'
+        : err.message || 'Error al cambiar la contraseña';
+      toast.error(msg);
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -240,6 +269,55 @@ export default function ProfilePage() {
           >
             {saving ? <FiLoader className="spinner" /> : <FiSave />}
             {saving ? 'Guardando...' : 'Guardar Cambios'}
+          </button>
+        </form>
+
+        <hr className="profile-divider" style={{ margin: '32px 0' }} />
+
+        <form onSubmit={handleChangePasswordSubmit} className="profile-form">
+          <h3 className="profile-section-title">
+            <FiLock /> Cambiar Contraseña
+          </h3>
+          <p className="profile-section-desc">
+            Ingresá tu nueva contraseña. Debe tener al menos 6 caracteres.
+          </p>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="form-group">
+              <label className="form-label">Nueva contraseña</label>
+              <input
+                className="form-input"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="••••••"
+                minLength={6}
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Confirmar contraseña</label>
+              <input
+                className="form-input"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="••••••"
+                minLength={6}
+                required
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            className="btn btn--outline"
+            disabled={changingPassword}
+            style={{ marginTop: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+          >
+            {changingPassword ? <FiLoader className="spinner" /> : <FiLock />}
+            {changingPassword ? 'Actualizando...' : 'Actualizar Contraseña'}
           </button>
         </form>
       </div>

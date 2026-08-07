@@ -68,6 +68,15 @@ export async function resetPassword(email: string): Promise<void> {
 }
 
 /**
+ * Cambia la contraseña del usuario logueado en Firebase Auth.
+ */
+export async function changePassword(newPassword: string): Promise<void> {
+  if (!auth.currentUser) throw new Error('No hay sesión activa');
+  const { updatePassword } = await import('firebase/auth');
+  await updatePassword(auth.currentUser, newPassword);
+}
+
+/**
  * Obtiene el perfil del usuario desde Firestore.
  */
 export async function getUserProfile(uid: string): Promise<AppUser | null> {
