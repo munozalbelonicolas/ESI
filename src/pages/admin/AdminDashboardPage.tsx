@@ -83,6 +83,11 @@ export default function AdminDashboard() {
           </div>
           <span className="admin-stat-card__label">Productos con poco stock</span>
           <span className="admin-stat-card__value">{lowStockProducts.length}</span>
+          {lowStockProducts.length > 0 && (
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-warning)', marginTop: 4 }}>
+              ⚠️ Requieren reposición
+            </span>
+          )}
         </div>
       </div>
 
@@ -92,22 +97,26 @@ export default function AdminDashboard() {
       </div>
 
       {lowStockProducts.length > 0 && (
-        <div className="admin-table-wrapper">
-          <div style={{ padding: 'var(--space-md)', borderBottom: '1px solid var(--color-border-light)' }}>
-            <h3 style={{ color: 'var(--color-warning)', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <FiAlertTriangle /> Alertas de stock
+        <div className="admin-table-wrapper" style={{ border: '2px solid var(--color-warning-light)', marginTop: 24 }}>
+          <div style={{ padding: 'var(--space-md)', borderBottom: '1px solid var(--color-border-light)', background: 'var(--color-warning-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 style={{ color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--text-lg)', margin: 0 }}>
+              <FiAlertTriangle style={{ color: 'var(--color-warning)' }} /> ⚠️ Productos que requieren reposición urgente (Stock ≤ 5)
             </h3>
           </div>
           <table className="admin-table">
             <thead>
-              <tr><th>Producto</th><th>Categoría</th><th>Stock</th><th>Precio</th></tr>
+              <tr><th>Producto</th><th>Categoría</th><th>Stock actual</th><th>Precio</th></tr>
             </thead>
             <tbody>
               {lowStockProducts.map(p => (
                 <tr key={p.id}>
-                  <td style={{ fontWeight: 600 }}>{p.name}</td>
+                  <td style={{ fontWeight: 700, color: 'var(--color-text)' }}>{p.name}</td>
                   <td>{p.category}</td>
-                  <td><span className="badge badge--out">{p.stock} uds</span></td>
+                  <td>
+                    <span className="badge badge--out" style={{ fontSize: 'var(--text-sm)', padding: '4px 12px' }}>
+                      {p.stock === 0 ? '¡SIN STOCK!' : `Solo ${p.stock} unidad(es)`}
+                    </span>
+                  </td>
                   <td>{formatPrice(p.price)}</td>
                 </tr>
               ))}
