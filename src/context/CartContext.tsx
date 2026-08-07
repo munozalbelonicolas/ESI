@@ -33,7 +33,7 @@ const CART_STORAGE_KEY = 'esi-cart';
 
 function loadCart(): CartItem[] {
   try {
-    const raw = localStorage.getItem(CART_STORAGE_KEY);
+    const raw = sessionStorage.getItem(CART_STORAGE_KEY);
     return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
@@ -41,7 +41,7 @@ function loadCart(): CartItem[] {
 }
 
 function saveCart(items: CartItem[]): void {
-  localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
+  sessionStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
 }
 
 export function CartProvider({ children }: { children: React.ReactNode }) {

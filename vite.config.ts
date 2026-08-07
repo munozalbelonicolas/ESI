@@ -84,9 +84,8 @@ export default defineConfig(({ mode }) => {
                   });
                 }
 
-                const rawSiteUrl = env.VITE_SITE_URL || '';
-                const isLocalhost = !rawSiteUrl || rawSiteUrl.includes('localhost') || rawSiteUrl.includes('127.0.0.1');
-                const baseUrl = isLocalhost ? 'http://localhost:5173' : rawSiteUrl;
+                const reqHost = req.headers.host || 'localhost:5173';
+                const baseUrl = `http://${reqHost}`;
 
                 const preferenceClient = new Preference(mp);
 

@@ -1,19 +1,38 @@
 import { useState, useEffect } from 'react';
 import { getAllOrders, updateOrderStatus, updatePaymentStatus } from '../../services/orderService';
+import { getTransferProof } from '../../services/storageService';
 import { formatPrice } from '../../utils/formatPrice';
 import { formatDateTime } from '../../utils/formatDate';
-import { ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS } from '../../types/order';
+import { ORDER_STATUS_LABELS } from '../../types/order';
 import type { Order, OrderStatus, PaymentStatus } from '../../types/order';
-import { FiExternalLink } from 'react-icons/fi';
+import { FiImage, FiX } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
+  const [proofModal, setProofModal] = useState<string | null>(null); // imageData
+  const [loadingProof, setLoadingProof] = useState<string | null>(null);
 
   const loadOrders = async () => { setOrders(await getAllOrders()); setLoading(false); };
   useEffect(() => { loadOrders(); }, []);
+
+  const handleViewProof = async (orderId: string) => {
+    setLoadingProof(orderId);
+    try {
+      const imageData = await getTransferProof(orderId);
+      if (imageData) {
+        setProofModal(imageData);
+      } else {
+        toast.error('No se encontró el comprobante');
+      }
+    } catch {
+      toast.error('Error al cargar el comprobante');
+    } finally {
+      setLoadingProof(null);
+    }
+  };
 
   const handleStatusChange = async (orderId: string, status: OrderStatus) => {
     await updateOrderStatus(orderId, status);
@@ -75,12 +94,14 @@ export default function AdminOrdersPage() {
                   </select>
                 </td>
                 <td>
-                  {o.transferProofUrl ? (
-                    <a href={o.transferProofUrl} target="_blank" rel="noopener noreferrer" className="btn btn--ghost btn--sm">
-                      <FiExternalLink /> Ver
-                    </a>
-                  ) : o.paymentMethod === 'transfer' ? (
-                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-warning)' }}>Pendiente</span>
+                  {o.paymentMethod === 'transfer' ? (
+                    <button
+                      className="btn btn--ghost btn--sm"
+                      onClick={() => handleViewProof(o.id)}
+                      disabled={loadingProof === o.id}
+                    >
+                      {loadingProof === o.id ? '...' : <><FiImage /> Ver</>}
+                    </button>
                   ) : (
                     <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>MP</span>
                   )}
@@ -92,6 +113,38 @@ export default function AdminOrdersPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Modal comprobante */}
+      {proofModal && (
+        <div
+          onClick={() => setProofModal(null)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 9999, padding: 24,
+          }}
+        >
+          <div style={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }}>
+            <button
+              onClick={() => setProofModal(null)}
+              style={{
+                position: 'absolute', top: -16, right: -16,
+                background: 'white', border: 'none', borderRadius: '50%',
+                width: 32, height: 32, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <FiX />
+            </button>
+            <img
+              src={proofModal}
+              alt="Comprobante de transferencia"
+              style={{ maxWidth: '85vw', maxHeight: '85vh', borderRadius: 8, objectFit: 'contain' }}
+              onClick={e => e.stopPropagation()}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
