@@ -91,13 +91,8 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <div className="admin-chart">
-        <h3>Volumen de ventas mensual</h3>
-        <Bar data={chartData} options={{ responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }} />
-      </div>
-
       {lowStockProducts.length > 0 && (
-        <div className="admin-table-wrapper" style={{ border: '2px solid var(--color-warning-light)', marginTop: 24 }}>
+        <div className="admin-table-wrapper" style={{ border: '2px solid var(--color-warning-light)', marginBottom: 24 }}>
           <div style={{ padding: 'var(--space-md)', borderBottom: '1px solid var(--color-border-light)', background: 'var(--color-warning-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3 style={{ color: 'var(--color-text)', display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--text-lg)', margin: 0 }}>
               <FiAlertTriangle style={{ color: 'var(--color-warning)' }} /> ⚠️ Productos que requieren reposición urgente (Stock ≤ 5)
@@ -124,6 +119,11 @@ export default function AdminDashboard() {
           </table>
         </div>
       )}
+
+      <div className="admin-chart">
+        <h3>Volumen de ventas mensual</h3>
+        <Bar data={chartData} options={{ responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }} />
+      </div>
     </div>
   );
 }
