@@ -57,8 +57,9 @@
 
 .filter-chip--active {
   background: var(--color-secondary);
-  color: white;
+  color: var(--color-primary);
   border-color: var(--color-secondary);
+  font-weight: 700;
 }
 
 .shop-page__empty {

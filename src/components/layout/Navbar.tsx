@@ -145,9 +145,14 @@ export default function Navbar() {
             </>
           )}
           {isAdmin && (
-            <Link to="/admin" className="btn btn--secondary btn--full" onClick={() => setMobileOpen(false)}>
-              Panel admin
-            </Link>
+            <>
+              <Link to="/admin" className="btn btn--secondary btn--full" onClick={() => setMobileOpen(false)}>
+                Panel admin
+              </Link>
+              <button className="navbar__mobile-link navbar__mobile-link--logout" onClick={handleLogout}>
+                Cerrar sesión
+              </button>
+            </>
           )}
         </div>
       )}
