@@ -62,7 +62,7 @@ export default function BlogPostPage() {
   );
 
   return (
-    <div className="section">
+    <article className="section" aria-labelledby="blog-post-title">
       <div className="container container--narrow">
         <Link to="/blog" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: 'var(--color-text-light)', fontFamily: 'var(--font-heading)', fontWeight: 600, marginBottom: 24 }}>
           <FiArrowLeft /> Volver al blog
@@ -73,7 +73,7 @@ export default function BlogPostPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
           <FiCalendar size={14} /> {formatDate(post.publishedAt)}
         </div>
-        <h1 style={{ marginBottom: 24, lineHeight: 1.2 }}>{post.title}</h1>
+        <h1 id="blog-post-title" style={{ marginBottom: 24, lineHeight: 1.2 }}>{post.title}</h1>
         {post.tags.length > 0 && (
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 32 }}>
             {post.tags.map((tag) => (
@@ -82,7 +82,28 @@ export default function BlogPostPage() {
           </div>
         )}
         <div className="rich-text" dangerouslySetInnerHTML={{ __html: post.body }} />
+
+        {/* ── Links internos — mejora SEO ── */}
+        <nav aria-label="Navegación relacionada" style={{ marginTop: 48, padding: '24px', background: 'var(--color-bg-alt)', borderRadius: 12, borderTop: '3px solid var(--color-secondary)' }}>
+          <h2 style={{ fontSize: 'var(--text-lg)', marginBottom: 16, color: 'var(--color-secondary)' }}>
+            ¿Te resultó útil este artículo?
+          </h2>
+          <p style={{ color: 'var(--color-text-light)', marginBottom: 16, fontSize: 'var(--text-sm)' }}>
+            Explorá más recursos de Educación Sexual Integral para tus clases.
+          </p>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <Link to="/tienda" className="btn btn--primary btn--sm">
+              Ver recursos de ESI
+            </Link>
+            <Link to="/blog" className="btn btn--outline btn--sm">
+              Más artículos del blog
+            </Link>
+            <Link to="/#sobre-nosotros" className="btn btn--ghost btn--sm">
+              Sobre Cristina Bronzatti
+            </Link>
+          </div>
+        </nav>
       </div>
-    </div>
+    </article>
   );
 }
