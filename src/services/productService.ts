@@ -151,6 +151,16 @@ export async function getAllProducts(): Promise<Product[]> {
  * Obtiene un producto por su slug.
  */
 export async function getProductBySlug(slug: string): Promise<Product | null> {
+  // 1. Buscar en caché de productos ya cargados
+  for (const entry of productsCache.values()) {
+    const found = entry.data.products.find((p) => p.slug === slug);
+    if (found) return found;
+  }
+  for (const entry of featuredCache.values()) {
+    const found = entry.data.find((p) => p.slug === slug);
+    if (found) return found;
+  }
+
   try {
     const q = query(collection(db, COLLECTION), where('slug', '==', slug), limit(1));
     const snap = await getDocs(q);
@@ -168,6 +178,16 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
  * Obtiene un producto por su ID.
  */
 export async function getProductById(id: string): Promise<Product | null> {
+  // 1. Buscar en caché de productos ya cargados
+  for (const entry of productsCache.values()) {
+    const found = entry.data.products.find((p) => p.id === id);
+    if (found) return found;
+  }
+  for (const entry of featuredCache.values()) {
+    const found = entry.data.find((p) => p.id === id);
+    if (found) return found;
+  }
+
   try {
     const snap = await getDoc(doc(db, COLLECTION, id));
     if (snap.exists()) return { id: snap.id, ...snap.data() } as Product;

@@ -29,19 +29,37 @@ const FALLBACK_POSTS: BlogPost[] = SAMPLE_POSTS.map((p, i) => ({
   updatedAt: Timestamp.now(),
 }));
 
+// Caché en memoria de 5 minutos para ahorrar lecturas de Firestore
+const CACHE_TTL = 5 * 60 * 1000;
+let cachedBlogPosts: { timestamp: number; data: BlogPost[] } | null = null;
+
+export function clearBlogCache(): void {
+  cachedBlogPosts = null;
+}
+
 /**
- * Obtiene posts publicados. Fallback a datos de muestra si falla Firestore.
+ * Obtiene posts publicados con caché en memoria.
  */
 export async function getPublishedPosts(): Promise<BlogPost[]> {
+  if (cachedBlogPosts && Date.now() - cachedBlogPosts.timestamp < CACHE_TTL) {
+    return cachedBlogPosts.data;
+  }
+
   try {
     const q = query(
       collection(db, COLLECTION),
-      where('isPublished', '==', true),
-      orderBy('publishedAt', 'desc')
+      where('isPublished', '==', true)
     );
     const snap = await getDocs(q);
     if (!snap.empty) {
-      return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as BlogPost);
+      const posts = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as BlogPost);
+      const sorted = posts.sort((a, b) => {
+        const timeA = (a.publishedAt as any)?.seconds || 0;
+        const timeB = (b.publishedAt as any)?.seconds || 0;
+        return timeB - timeA;
+      });
+      cachedBlogPosts = { timestamp: Date.now(), data: sorted };
+      return sorted;
     }
   } catch (err) {
     console.warn('[blogService] Firestore no disponible, usando datos de muestra:', err);
@@ -69,6 +87,10 @@ export async function getAllPosts(): Promise<BlogPost[]> {
  * Obtiene un post por su slug.
  */
 export async function getPostBySlug(slug: string): Promise<BlogPost | null> {
+  if (cachedBlogPosts) {
+    const cached = cachedBlogPosts.data.find((p) => p.slug === slug);
+    if (cached) return cached;
+  }
   try {
     const q = query(collection(db, COLLECTION), where('slug', '==', slug), limit(1));
     const snap = await getDocs(q);
@@ -86,6 +108,10 @@ export async function getPostBySlug(slug: string): Promise<BlogPost | null> {
  * Obtiene un post por su ID.
  */
 export async function getPostById(id: string): Promise<BlogPost | null> {
+  if (cachedBlogPosts) {
+    const cached = cachedBlogPosts.data.find((p) => p.id === id);
+    if (cached) return cached;
+  }
   try {
     const snap = await getDoc(doc(db, COLLECTION, id));
     if (snap.exists()) return { id: snap.id, ...snap.data() } as BlogPost;
@@ -107,6 +133,7 @@ export async function createPost(data: BlogPostFormData): Promise<string> {
     createdAt: Timestamp.now(),
     updatedAt: Timestamp.now(),
   });
+  clearBlogCache();
   return ref.id;
 }
 
@@ -128,6 +155,7 @@ export async function updatePost(
     updates.publishedAt = Timestamp.now();
   }
   await updateDoc(doc(db, COLLECTION, id), updates);
+  clearBlogCache();
 }
 
 /**
@@ -135,6 +163,7 @@ export async function updatePost(
  */
 export async function deletePost(id: string): Promise<void> {
   await deleteDoc(doc(db, COLLECTION, id));
+  clearBlogCache();
 }
 
 /**
@@ -142,18 +171,9 @@ export async function deletePost(id: string): Promise<void> {
  */
 export async function getRecentPosts(count: number = 3): Promise<BlogPost[]> {
   try {
-    const q = query(
-      collection(db, COLLECTION),
-      where('isPublished', '==', true),
-      orderBy('publishedAt', 'desc'),
-      limit(count)
-    );
-    const snap = await getDocs(q);
-    if (!snap.empty) {
-      return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as BlogPost);
-    }
+    const posts = await getPublishedPosts();
+    return posts.slice(0, count);
   } catch {
-    // fallback
+    return FALLBACK_POSTS.slice(0, count);
   }
-  return FALLBACK_POSTS.slice(0, count);
 }
