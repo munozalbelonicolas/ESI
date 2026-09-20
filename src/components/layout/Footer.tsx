@@ -10,7 +10,14 @@ export default function Footer() {
         <div className="footer__grid">
           {/* Brand */}
           <div className="footer__brand">
-            <img src={SITE_CONFIG.logo} alt={SITE_CONFIG.name} className="footer__logo" />
+            <img
+              src={SITE_CONFIG.logo}
+              alt={SITE_CONFIG.name}
+              className="footer__logo"
+              width="140"
+              height="56"
+              loading="lazy"
+            />
             <p className="footer__tagline">{SITE_CONFIG.tagline}</p>
           </div>
 

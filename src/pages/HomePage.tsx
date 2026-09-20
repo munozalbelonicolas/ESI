@@ -71,14 +71,25 @@ export default function HomePage() {
             </div>
           </div>
           <div className="hero__visual animate-fade-in">
-            <img src={SITE_CONFIG.logo} alt="ESI en Secundaria" className="hero__logo-img" />
+            <img
+              src={SITE_CONFIG.logo}
+              alt="ESI en Secundaria"
+              className="hero__logo-img"
+              width="280"
+              height="280"
+              fetchPriority="high"
+            />
           </div>
         </div>
       </section>
 
       {/* ── Propuesta de valor ── */}
-      <section className="value-props section">
+      <section className="value-props section" aria-labelledby="value-props-heading">
         <div className="container">
+          <div className="section-header" style={{ textAlign: 'center', marginBottom: 'var(--space-2xl)' }}>
+            <h2 id="value-props-heading">¿Por qué elegir nuestros recursos?</h2>
+            <p>Herramientas pedagógicas claras, actualizadas y listas para llevar al aula</p>
+          </div>
           <div className="value-props__grid">
             <div className="value-prop animate-slide-up">
               <div className="value-prop__icon">
@@ -198,7 +209,14 @@ export default function HomePage() {
             <div className="about__visual">
               <div className="about__image-wrapper">
                 <div className="about__portrait-frame">
-                  <img src={crisImage} alt="Cristina Bronzatti — ESI en Secundaria" className="about__portrait-img" loading="lazy" />
+                  <img
+                    src={crisImage}
+                    alt="Cristina Bronzatti — ESI en Secundaria"
+                    className="about__portrait-img"
+                    loading="lazy"
+                    width="400"
+                    height="400"
+                  />
                 </div>
               </div>
             </div>
@@ -220,7 +238,14 @@ export default function HomePage() {
               {posts.map((post) => (
                 <Link key={post.id} to={`/blog/${post.slug}`} className="blog-preview-card card">
                   {post.coverImage && (
-                    <img src={post.coverImage} alt={post.title} className="blog-preview-card__image" loading="lazy" />
+                    <img
+                      src={post.coverImage}
+                      alt={post.title}
+                      className="blog-preview-card__image"
+                      loading="lazy"
+                      width="400"
+                      height="225"
+                    />
                   )}
                   <div className="blog-preview-card__body">
                     <span className="blog-preview-card__date">{formatDate(post.publishedAt)}</span>

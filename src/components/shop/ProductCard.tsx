@@ -43,6 +43,8 @@ export default function ProductCard({ product, priority = false }: Props) {
           src={imageUrl}
           alt={product.name}
           className="product-card__image"
+          width="300"
+          height="300"
           loading={priority ? 'eager' : 'lazy'}
           decoding="async"
           {...(priority ? { fetchPriority: 'high' } : {})}

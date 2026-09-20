@@ -121,6 +121,8 @@ export default function ProductPage() {
                 src={getOptimizedImageUrl(product.images[selectedImage], 800)}
                 alt={product.name}
                 className="product-page__main-image"
+                width="600"
+                height="600"
                 loading="eager"
                 decoding="async"
               />
@@ -133,7 +135,7 @@ export default function ProductPage() {
                     className={`product-page__thumb ${i === selectedImage ? 'product-page__thumb--active' : ''}`}
                     onClick={() => setSelectedImage(i)}
                   >
-                    <img src={getOptimizedImageUrl(img, 150)} alt={`${product.name} ${i + 1}`} loading="lazy" />
+                    <img src={getOptimizedImageUrl(img, 150)} alt={`${product.name} ${i + 1}`} width="70" height="70" loading="lazy" />
                   </button>
                 ))}
               </div>

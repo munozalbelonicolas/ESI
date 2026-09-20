@@ -68,7 +68,13 @@ export default function BlogPostPage() {
           <FiArrowLeft /> Volver al blog
         </Link>
         {post.coverImage && (
-          <img src={post.coverImage} alt={post.title} style={{ width: '100%', borderRadius: 12, marginBottom: 24, aspectRatio: '16/7', objectFit: 'cover' }} />
+          <img
+            src={post.coverImage}
+            alt={post.title}
+            width="800"
+            height="350"
+            style={{ width: '100%', borderRadius: 12, marginBottom: 24, aspectRatio: '16/7', objectFit: 'cover' }}
+          />
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, color: 'var(--color-text-muted)', fontSize: 'var(--text-sm)' }}>
           <FiCalendar size={14} /> {formatDate(post.publishedAt)}

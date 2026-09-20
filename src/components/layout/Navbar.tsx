@@ -44,7 +44,7 @@ export default function Navbar() {
       <header className={`navbar ${mobileOpen ? 'navbar--open' : ''}`}>
         <div className="container navbar__inner">
           <Link to="/" className="navbar__logo" onClick={() => setMobileOpen(false)}>
-            <img src={SITE_CONFIG.logo} alt={SITE_CONFIG.name} className="navbar__logo-img" />
+            <img src={SITE_CONFIG.logo} alt={SITE_CONFIG.name} className="navbar__logo-img" width="130" height="52" />
           </Link>
 
           {/* Desktop nav */}
