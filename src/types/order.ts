@@ -39,6 +39,7 @@ export interface Order {
   mpPaymentId: string | null;
   transferProofUrl: string | null;
   status: OrderStatus;
+  emailSent?: boolean;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

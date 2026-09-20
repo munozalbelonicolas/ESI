@@ -11,6 +11,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { MercadoPagoConfig, Payment } from 'mercadopago';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { sendOrderConfirmationEmail } from './notify-purchase';
 
 const mpAccessToken = process.env.MP_ACCESS_TOKEN;
 
@@ -90,8 +91,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           };
           if (paymentStatus === 'approved') {
             updates.status = 'paid';
+            const orderData = orderSnap.data() || {};
+
             // Decrementar stock de cada item
-            const items = orderSnap.data()?.items || [];
+            const items = orderData.items || [];
             for (const item of items) {
               if (item.isDigital) continue;
               const productRef = db.collection('products').doc(item.productId);
@@ -104,6 +107,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     updatedAt: new Date(),
                   });
                 }
+              }
+            }
+
+            // Enviar email de confirmación al cliente y aviso al admin (si no fue enviado antes)
+            if (!orderData.emailSent && orderData.userEmail) {
+              try {
+                await sendOrderConfirmationEmail({
+                  orderId,
+                  userEmail: orderData.userEmail,
+                  userName: orderData.userName,
+                  items: orderData.items || [],
+                  total: orderData.total || 0,
+                  paymentMethod: 'mercadopago',
+                  shippingAddress: orderData.shippingAddress || null,
+                  shippingMethod: orderData.shippingMethod || '',
+                });
+                updates.emailSent = true;
+                console.log(`[Webhook] Notificaciones por email enviadas para orden #${orderId}`);
+              } catch (emailErr) {
+                console.error(`[Webhook] Error enviando email para orden #${orderId}:`, emailErr);
               }
             }
           }

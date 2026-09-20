@@ -8,7 +8,7 @@
  * Si se sirve desde Firebase Hosting u otro origen, usar VITE_API_BASE_URL.
  */
 
-import type { OrderItem } from '../types/order';
+import type { OrderItem, ShippingAddress } from '../types/order';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 
@@ -26,6 +26,8 @@ export interface NotifyPurchaseData {
   items: OrderItem[];
   total: number;
   paymentMethod: string;
+  shippingAddress?: ShippingAddress | null;
+  shippingMethod?: string;
 }
 
 /**

@@ -141,6 +141,16 @@ export async function updatePaymentStatus(
 }
 
 /**
+ * Marca que la notificación por email de la orden ya fue enviada.
+ */
+export async function updateOrderEmailSent(orderId: string): Promise<void> {
+  await updateDoc(doc(db, COLLECTION, orderId), {
+    emailSent: true,
+    updatedAt: Timestamp.now(),
+  });
+}
+
+/**
  * Guarda la URL del comprobante de transferencia.
  */
 export async function saveTransferProof(

@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { FiCheckCircle } from 'react-icons/fi';
-import { updateOrderStatus, updatePaymentStatus } from '../services/orderService';
+import { updateOrderStatus, updatePaymentStatus, getOrderById, updateOrderEmailSent } from '../services/orderService';
+import { sendPurchaseConfirmation } from '../services/paymentService';
 
 export default function CheckoutSuccessPage() {
   const [params] = useSearchParams();
@@ -14,6 +15,25 @@ export default function CheckoutSuccessPage() {
       if (!collectionStatus || collectionStatus === 'approved') {
         updateOrderStatus(orderId, 'paid').catch(() => {});
         updatePaymentStatus(orderId, 'approved').catch(() => {});
+
+        // Asegurar envío de email si el webhook aún no lo procesó o en pruebas locales
+        getOrderById(orderId)
+          .then(async (order) => {
+            if (order && !order.emailSent && order.userEmail) {
+              await updateOrderEmailSent(orderId).catch(() => {});
+              await sendPurchaseConfirmation({
+                orderId: order.id,
+                userEmail: order.userEmail,
+                userName: order.userName,
+                items: order.items || [],
+                total: order.total,
+                paymentMethod: order.paymentMethod || 'mercadopago',
+                shippingAddress: order.shippingAddress,
+                shippingMethod: order.shippingMethod,
+              }).catch((err) => console.warn('[CheckoutSuccess] Error enviando email:', err));
+            }
+          })
+          .catch(() => {});
       }
     }
   }, [orderId, collectionStatus]);
