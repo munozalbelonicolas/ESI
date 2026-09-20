@@ -78,7 +78,7 @@
 }
 
 .product-card__price--free {
-  color: var(--color-success);
+  color: #0f5132;
 }
 
 .product-card__compare-price {

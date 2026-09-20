@@ -3,8 +3,6 @@
    Extraído de: esiensecundaria.empretienda.com.ar
    ======================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Asap+Condensed:wght@400;500;600;700&family=Balsamiq+Sans:wght@400;700&display=swap');
-
 /* ── CSS Custom Properties ── */
 :root {
   /* Paleta principal */
@@ -431,8 +429,9 @@ input, textarea, select {
 }
 
 .badge--free {
-  background-color: var(--color-success-light);
-  color: var(--color-success);
+  background-color: #d1e7dd;
+  color: #0f5132;
+  font-weight: 700;
 }
 
 .badge--sale {
@@ -451,8 +450,9 @@ input, textarea, select {
 }
 
 .badge--digital {
-  background-color: var(--color-info-light);
-  color: var(--color-info);
+  background-color: #cfe2ff;
+  color: #084298;
+  font-weight: 700;
 }
 
 /* ── Grid Layouts ── */

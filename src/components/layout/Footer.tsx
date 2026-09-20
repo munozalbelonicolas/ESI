@@ -23,7 +23,7 @@ export default function Footer() {
 
           {/* Navigation */}
           <div className="footer__section">
-            <h4 className="footer__title">Navegación</h4>
+            <h3 className="footer__title">Navegación</h3>
             <nav className="footer__nav">
               {NAV_LINKS.map((link) => (
                 <Link key={link.path} to={link.path} className="footer__link">
@@ -35,7 +35,7 @@ export default function Footer() {
 
           {/* Categorías */}
           <div className="footer__section">
-            <h4 className="footer__title">Categorías</h4>
+            <h3 className="footer__title">Categorías</h3>
             <nav className="footer__nav">
               <Link to="/tienda?cat=Cuadernillos" className="footer__link">Cuadernillos</Link>
               <Link to="/tienda?cat=Juegos" className="footer__link">Juegos</Link>
@@ -46,7 +46,7 @@ export default function Footer() {
 
           {/* Contacto */}
           <div className="footer__section">
-            <h4 className="footer__title">Contacto</h4>
+            <h3 className="footer__title">Contacto</h3>
             <div className="footer__nav">
               <a href={`mailto:${SITE_CONFIG.email}`} className="footer__link footer__link--icon">
                 <FiMail size={16} /> {SITE_CONFIG.email}
