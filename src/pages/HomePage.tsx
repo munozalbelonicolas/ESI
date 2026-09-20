@@ -10,12 +10,21 @@ import type { BlogPost } from '../types/blog';
 import { formatDate } from '../utils/formatDate';
 import { FiArrowRight, FiBookOpen, FiHeart, FiUsers, FiAward } from 'react-icons/fi';
 import crisImage from '../assets/cris.webp';
+import { useSEO } from '../hooks/useSEO';
 import './HomePage.css';
 
 export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useSEO({
+    title: 'ESI en Secundaria — Recursos de Educación Sexual Integral para Docentes',
+    description:
+      'Cuadernillos didácticos, secuencias, juegos y recursos de ESI para nivel secundario en Argentina. Creados por Cristina Bronzatti, Licenciada en Educación y Especialista en ESI.',
+    keywords:
+      'ESI, Educación Sexual Integral, secundaria, cuadernillos ESI, juegos ESI, docentes, Cristina Bronzatti, Argentina, secuencias didácticas',
+  });
 
   useEffect(() => {
     async function load() {

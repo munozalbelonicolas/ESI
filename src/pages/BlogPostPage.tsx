@@ -4,11 +4,44 @@ import { getPostBySlug } from '../services/blogService';
 import { formatDate } from '../utils/formatDate';
 import type { BlogPost } from '../types/blog';
 import { FiArrowLeft, FiCalendar } from 'react-icons/fi';
+import { useSEO } from '../hooks/useSEO';
 
 export default function BlogPostPage() {
   const { slug } = useParams<{ slug: string }>();
   const [post, setPost] = useState<BlogPost | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const blogJsonLd = post ? {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: post.title,
+    description: post.excerpt || post.title,
+    image: post.coverImage || 'https://esiensecundaria.com.ar/ESI%20LOGO.webp',
+    author: {
+      '@type': 'Person',
+      name: post.author || 'Cristina Bronzatti',
+      jobTitle: 'Especialista en Educación Sexual Integral',
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: 'ESI en Secundaria',
+      logo: {
+        '@type': 'ImageObject',
+        url: 'https://esiensecundaria.com.ar/ESI%20LOGO.webp',
+      },
+    },
+    datePublished: post.publishedAt?.toDate ? post.publishedAt.toDate().toISOString() : new Date().toISOString(),
+    mainEntityOfPage: `https://esiensecundaria.com.ar/blog/${post.slug}`,
+  } : undefined;
+
+  useSEO({
+    title: post ? post.title : 'Artículo de Blog',
+    description: post?.excerpt ? post.excerpt.slice(0, 160) : 'Artículo pedagógico sobre Educación Sexual Integral en secundaria.',
+    canonical: post ? `/blog/${post.slug}` : undefined,
+    image: post?.coverImage,
+    type: 'article',
+    jsonLd: blogJsonLd,
+  });
 
   useEffect(() => {
     async function load() {

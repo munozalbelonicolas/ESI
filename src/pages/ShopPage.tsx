@@ -5,6 +5,7 @@ import ProductCard from '../components/shop/ProductCard';
 import { PRODUCT_CATEGORIES } from '../types/product';
 import type { Product } from '../types/product';
 import { FiFilter, FiX } from 'react-icons/fi';
+import { useSEO } from '../hooks/useSEO';
 import './ShopPage.css';
 
 export default function ShopPage() {
@@ -12,6 +13,16 @@ export default function ShopPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState(searchParams.get('cat') || '');
+
+  useSEO({
+    title: activeCategory
+      ? `${activeCategory} | Tienda ESI en Secundaria`
+      : 'Tienda de Recursos y Cuadernillos de ESI para Secundaria',
+    description: activeCategory
+      ? `Explorá nuestra colección de ${activeCategory} de Educación Sexual Integral para nivel secundario.`
+      : 'Catálogo de cuadernillos, juegos, cursos y secuencias didácticas de ESI listos para usar en el aula.',
+    canonical: activeCategory ? `/tienda?cat=${encodeURIComponent(activeCategory)}` : '/tienda',
+  });
 
   useEffect(() => {
     async function load() {

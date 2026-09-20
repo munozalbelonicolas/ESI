@@ -2,12 +2,20 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getPublishedPosts } from '../services/blogService';
 import { formatDate } from '../utils/formatDate';
+import { useSEO } from '../hooks/useSEO';
 import type { BlogPost } from '../types/blog';
 import './BlogPage.css';
 
 export default function BlogPage() {
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useSEO({
+    title: 'Blog Pedagógico de ESI — Artículos, Ensayos y Recursos',
+    description:
+      'Reflexiones, secuencias didácticas y estrategias pedagógicas sobre Educación Sexual Integral en la escuela secundaria por Cristina Bronzatti.',
+    canonical: '/blog',
+  });
 
   useEffect(() => {
     async function load() {

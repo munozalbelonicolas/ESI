@@ -9,6 +9,7 @@ import { trackViewItem, trackAddToCart } from '../config/analytics';
 import type { Product } from '../types/product';
 import { FiShoppingBag, FiArrowLeft, FiMinus, FiPlus, FiDownload, FiTruck, FiSearch, FiTag, FiInfo } from 'react-icons/fi';
 import toast from 'react-hot-toast';
+import { useSEO } from '../hooks/useSEO';
 import './ProductPage.css';
 
 export default function ProductPage() {
@@ -21,6 +22,39 @@ export default function ProductPage() {
   const [quotes, setQuotes] = useState<ShippingQuote[]>([]);
   const [calcLoading, setCalcLoading] = useState(false);
   const { addItem, isInCart } = useCartContext();
+
+  const productJsonLd = product ? {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.name,
+    description: product.description || `Recurso de ESI para nivel secundario: ${product.name}`,
+    image: product.images || [],
+    category: product.category,
+    brand: {
+      '@type': 'Brand',
+      name: 'ESI en Secundaria',
+    },
+    offers: {
+      '@type': 'Offer',
+      price: product.isFree ? 0 : product.price,
+      priceCurrency: 'ARS',
+      availability: !product.isDigital && product.stock === 0 ? 'https://schema.org/OutOfStock' : 'https://schema.org/InStock',
+      url: `https://esiensecundaria.com.ar/tienda/${product.slug}`,
+      seller: {
+        '@type': 'Person',
+        name: 'Cristina Bronzatti',
+      },
+    },
+  } : undefined;
+
+  useSEO({
+    title: product ? product.name : 'Producto',
+    description: product?.description ? product.description.slice(0, 160) : 'Material didáctico de Educación Sexual Integral para secundaria.',
+    canonical: product ? `/tienda/${product.slug}` : undefined,
+    image: product?.images[0],
+    type: 'product',
+    jsonLd: productJsonLd,
+  });
 
   useEffect(() => {
     async function load() {
