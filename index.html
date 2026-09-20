@@ -40,21 +40,47 @@
   <meta name="twitter:image"
     content="https://d22fxaf9t8d39k.cloudfront.net/9f9e8e95da2ed9e665173f111bb758d1dd792087a99ee5cdce9e721472df48a9202263.png" />
 
-  <!-- Structured Data / JSON-LD for Google SEO & Authorship -->
+  <!-- Structured Data / JSON-LD for Google SEO & AI Knowledge Graph (E-E-A-T) -->
   <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@type": "WebSite",
-        "name": "ESI en Secundaria",
-        "url": "https://esiensecundaria.com.ar",
-        "description": "Recursos de Educación Sexual Integral para docentes de nivel secundario.",
-        "creator": {
-          "@type": "Organization",
-          "name": "NiloTech",
-          "url": "https://nilotech.online/"
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "https://esiensecundaria.com.ar/#website",
+          "url": "https://esiensecundaria.com.ar",
+          "name": "ESI en Secundaria",
+          "description": "Recursos, cuadernillos didácticos, juegos y secuencias de Educación Sexual Integral para docentes de nivel secundario en Argentina.",
+          "inLanguage": "es-AR",
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": "https://esiensecundaria.com.ar/tienda?q={search_term_string}",
+            "query-input": "required name=search_term_string"
+          }
+        },
+        {
+          "@type": "EducationalOrganization",
+          "@id": "https://esiensecundaria.com.ar/#organization",
+          "name": "ESI en Secundaria",
+          "url": "https://esiensecundaria.com.ar",
+          "logo": "https://esiensecundaria.com.ar/ESI%20LOGO.webp",
+          "email": "esiensecundaria@gmail.com",
+          "sameAs": [
+            "https://www.instagram.com/esiensecundaria/"
+          ],
+          "founder": {
+            "@type": "Person",
+            "name": "Cristina Bronzatti",
+            "jobTitle": "Especialista en Educación Sexual Integral",
+            "description": "Profesora de Lengua y Literatura, Licenciada en Educación y Especialista en Educación Sexual Integral (INFoD y UBA).",
+            "sameAs": [
+              "https://www.instagram.com/esiensecundaria/"
+            ]
+          }
         }
-      }
-    </script>
+      ]
+    }
+  </script>
   <link rel="icon" type="image/webp" href="/ESI LOGO.webp" />
   <link rel="apple-touch-icon" href="/ESI LOGO.webp" />
   <link rel="manifest" href="/manifest.json" />

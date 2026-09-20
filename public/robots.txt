@@ -1,5 +1,39 @@
 User-agent: *
 Allow: /
 Disallow: /admin
+Disallow: /perfil
+Disallow: /mis-ordenes
+Disallow: /checkout
 
+# AI Search & Retrieval Bots (Permitidos para búsqueda e indexación)
+User-agent: GPTBot
+Allow: /
+Disallow: /admin
+
+User-agent: ChatGPT-User
+Allow: /
+Disallow: /admin
+
+User-agent: PerplexityBot
+Allow: /
+Disallow: /admin
+
+User-agent: ClaudeBot
+Allow: /
+Disallow: /admin
+
+User-agent: anthropic-ai
+Allow: /
+Disallow: /admin
+
+User-agent: Google-Extended
+Allow: /
+Disallow: /admin
+
+User-agent: Applebot-Extended
+Allow: /
+Disallow: /admin
+
+# Sitemaps y manifiesto LLM
 Sitemap: https://esiensecundaria.com.ar/sitemap.xml
+# Manifiesto estructurado para IA: https://esiensecundaria.com.ar/llms.txt

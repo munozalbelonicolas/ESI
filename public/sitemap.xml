@@ -15,4 +15,34 @@
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
+  <url>
+    <loc>https://esiensecundaria.com.ar/tienda?cat=Cuadernillos</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://esiensecundaria.com.ar/tienda?cat=Juegos</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://esiensecundaria.com.ar/tienda?cat=Cursos%20asincr%C3%B3nicos</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://esiensecundaria.com.ar/tienda?cat=Caja%20de%20herramientas</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://esiensecundaria.com.ar/tienda?cat=Calendario%20y%20Efem%C3%A9rides</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://esiensecundaria.com.ar/tienda?cat=Promociones</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
 </urlset>

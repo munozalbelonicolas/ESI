@@ -26,6 +26,14 @@ export default function ProductCard({ product, priority = false }: Props) {
     trackAddToCart(product.id, product.name, product.price, 1);
   };
 
+  const handleDownloadFree = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (product.digitalFileUrl) {
+      window.open(product.digitalFileUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
+
   const imageUrl = getOptimizedImageUrl(product.images[0], 500);
 
   return (
@@ -72,16 +80,14 @@ export default function ProductCard({ product, priority = false }: Props) {
           </div>
         )}
         {product.isFree && product.digitalFileUrl ? (
-          <a
-            href={product.digitalFileUrl}
-            target="_blank"
-            rel="noopener noreferrer"
+          <button
+            type="button"
             className="product-card__btn btn btn--primary btn--sm btn--full"
-            onClick={e => e.stopPropagation()}
+            onClick={handleDownloadFree}
             style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
           >
             <FiDownload size={16} /> Descargar gratis
-          </a>
+          </button>
         ) : (
           <button
             className={`product-card__btn btn ${alreadyInCart ? 'btn--ghost' : 'btn--primary'} btn--sm btn--full`}
