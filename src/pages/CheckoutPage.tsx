@@ -59,7 +59,15 @@ export default function CheckoutPage() {
   }, 0);
 
   const subtotal = getSubtotal();
-  const discount = appliedCoupon ? calculateDiscount(appliedCoupon, subtotal) : 0;
+  const couponDiscount = appliedCoupon ? calculateDiscount(appliedCoupon, subtotal) : 0;
+  const transferDiscount = paymentMethod === 'transfer'
+    ? items.reduce((acc, i) => {
+        const pct = i.product.transferDiscountPercent;
+        if (!pct || pct <= 0) return acc;
+        return acc + Math.round(i.product.price * i.quantity * (pct / 100));
+      }, 0)
+    : 0;
+  const discount = couponDiscount + transferDiscount;
   const shippingCost = hasDigitalOnly ? 0 : (selectedShipping?.price || 0);
   const total = subtotal - discount + shippingCost;
 
@@ -411,7 +419,16 @@ export default function CheckoutPage() {
           <div className="checkout-summary">
             <h3>Resumen</h3>
             <div className="cart-summary__row"><span>Subtotal</span><span>{formatPrice(subtotal)}</span></div>
-            {discount > 0 && <div className="cart-summary__row" style={{ color: 'var(--color-success)' }}><span>Descuento ({appliedCoupon?.code})</span><span>-{formatPrice(discount)}</span></div>}
+            {transferDiscount > 0 && (
+              <div className="cart-summary__row" style={{ color: 'var(--color-success)' }}>
+                <span>Desc. Transferencia</span><span>-{formatPrice(transferDiscount)}</span>
+              </div>
+            )}
+            {couponDiscount > 0 && (
+              <div className="cart-summary__row" style={{ color: 'var(--color-success)' }}>
+                <span>Cupón ({appliedCoupon?.code})</span><span>-{formatPrice(couponDiscount)}</span>
+              </div>
+            )}
             <div className="cart-summary__row"><span>Envío</span><span>{shippingCost === 0 ? 'Gratis' : formatPrice(shippingCost)}</span></div>
             <div className="cart-summary__row cart-summary__row--total"><span>Total</span><span>{formatPrice(total)}</span></div>
           </div>
