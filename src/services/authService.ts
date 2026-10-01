@@ -5,6 +5,8 @@ import {
   sendEmailVerification,
   sendPasswordResetEmail,
   updateProfile,
+  signInWithPopup,
+  GoogleAuthProvider,
   User,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc, updateDoc, Timestamp } from 'firebase/firestore';
@@ -38,6 +40,34 @@ export async function registerUser(
 
   // Enviar email de verificación
   await sendEmailVerification(user);
+
+  return user;
+}
+
+/**
+ * Inicia sesión con Google (popup).
+ * Si es la primera vez, crea el documento en Firestore.
+ */
+export async function loginWithGoogle(): Promise<User> {
+  const provider = new GoogleAuthProvider();
+  const cred = await signInWithPopup(auth, provider);
+  const user = cred.user;
+
+  // Crear documento en Firestore sólo si no existe
+  const userRef = doc(db, 'users', user.uid);
+  const snap = await getDoc(userRef);
+  if (!snap.exists()) {
+    await setDoc(userRef, {
+      email: user.email ?? '',
+      displayName: user.displayName ?? '',
+      phone: '',
+      avatarUrl: user.photoURL ?? '',
+      role: 'customer',
+      emailVerified: true, // Google siempre verifica el email
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    });
+  }
 
   return user;
 }

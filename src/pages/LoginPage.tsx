@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { loginUser, resetPassword } from '../services/authService';
+import { loginUser, resetPassword, loginWithGoogle } from '../services/authService';
 import { SITE_CONFIG } from '../config/site';
 import { FiMail, FiLock, FiLogIn } from 'react-icons/fi';
 import toast from 'react-hot-toast';
@@ -10,6 +10,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [resetModalOpen, setResetModalOpen] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
@@ -31,6 +32,21 @@ export default function LoginPage() {
       toast.error(msg);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setGoogleLoading(true);
+    try {
+      await loginWithGoogle();
+      toast.success('¡Bienvenida/o!');
+      navigate('/');
+    } catch (err: any) {
+      if (err.code !== 'auth/popup-closed-by-user') {
+        toast.error('No se pudo iniciar sesión con Google');
+      }
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -89,6 +105,32 @@ export default function LoginPage() {
         <div className="auth-card__footer">
           <p>¿No tenés cuenta? <Link to="/registro">Crear cuenta</Link></p>
         </div>
+
+        {/* Separador */}
+        <div className="auth-divider"><span>o</span></div>
+
+        {/* Botón Google */}
+        <button
+          type="button"
+          className="btn-google"
+          onClick={handleGoogleLogin}
+          disabled={googleLoading || loading}
+          id="btn-google-login"
+        >
+          {googleLoading ? (
+            <div className="spinner spinner--sm" />
+          ) : (
+            <>
+              <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+                <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+              </svg>
+              Continuar con Google
+            </>
+          )}
+        </button>
       </div>
 
       {/* Modal de Recuperar Contraseña */}

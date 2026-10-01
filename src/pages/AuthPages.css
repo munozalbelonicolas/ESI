@@ -17,3 +17,31 @@
   text-align: center; margin-top: var(--space-lg); font-size: var(--text-sm); color: var(--color-text-light);
 }
 .auth-card__footer a { color: var(--color-secondary); font-weight: 700; }
+
+/* Separador */
+.auth-divider {
+  display: flex; align-items: center; gap: var(--space-sm);
+  margin: var(--space-lg) 0 var(--space-md);
+  color: var(--color-text-light); font-size: var(--text-sm);
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: ''; flex: 1; height: 1px; background: var(--color-border);
+}
+
+/* Botón Google */
+.btn-google {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: 100%; padding: 11px 16px;
+  background: #fff; border: 1.5px solid #dadce0; border-radius: var(--radius-md);
+  font-size: var(--text-sm); font-weight: 600; color: #3c4043;
+  cursor: pointer; transition: background var(--transition-base), box-shadow var(--transition-base);
+  font-family: inherit;
+}
+.btn-google:hover:not(:disabled) {
+  background: #f8f9fa; box-shadow: 0 1px 4px rgba(60,64,67,.2);
+}
+.btn-google:focus-visible {
+  outline: 2px solid #4285F4; outline-offset: 2px;
+}
+.btn-google:disabled { opacity: 0.6; cursor: not-allowed; }
