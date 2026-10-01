@@ -102,12 +102,6 @@ export default function LoginPage() {
             {loading ? <div className="spinner spinner--sm" /> : <><FiLogIn /> Ingresar</>}
           </button>
         </form>
-        <div className="auth-card__footer">
-          <p>¿No tenés cuenta? <Link to="/registro">Crear cuenta</Link></p>
-        </div>
-
-        {/* Separador */}
-        <div className="auth-divider"><span>o</span></div>
 
         {/* Botón Google */}
         <button
@@ -131,7 +125,15 @@ export default function LoginPage() {
             </>
           )}
         </button>
-      </div>
+
+        {/* Separador */}
+        <div className="auth-divider"><span>o</span></div>
+
+        <div className="auth-card__footer">
+          <p>¿No tenés cuenta? <Link to="/registro">Crear cuenta</Link></p>
+        </div>
+
+      </div>{/* fin auth-card */}
 
       {/* Modal de Recuperar Contraseña */}
       {resetModalOpen && (

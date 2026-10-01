@@ -86,10 +86,6 @@ export default function RegisterPage() {
             {loading ? <div className="spinner spinner--sm" /> : <><FiUserPlus /> Crear cuenta</>}
           </button>
         </form>
-        <div className="auth-card__footer">
-          <p>¿Ya tenés cuenta? <Link to="/login">Iniciar sesión</Link></p>
-        </div>
-
         {/* Separador */}
         <div className="auth-divider"><span>o</span></div>
 
@@ -115,6 +111,10 @@ export default function RegisterPage() {
             </>
           )}
         </button>
+
+        <div className="auth-card__footer">
+          <p>¿Ya tenés cuenta? <Link to="/login">Iniciar sesión</Link></p>
+        </div>
       </div>
     </div>
   );
