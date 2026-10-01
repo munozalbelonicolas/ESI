@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { auth } from '../config/firebase';
+import { doc, updateDoc } from 'firebase/firestore';
+import { auth, db } from '../config/firebase';
 import { getUserProfile } from '../services/authService';
 import type { AppUser } from '../types/user';
 
@@ -48,6 +49,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         auth,
         async (user) => {
           setFirebaseUser(user);
+
+          // Sincronizar emailVerified de Firebase Auth → Firestore
+          if (user?.emailVerified) {
+            try {
+              const userRef = doc(db, 'users', user.uid);
+              await updateDoc(userRef, { emailVerified: true });
+            } catch (e) {
+              console.warn('[AuthContext] No se pudo sincronizar emailVerified:', e);
+            }
+          }
+
           await loadProfile(user);
           setLoading(false);
         },
