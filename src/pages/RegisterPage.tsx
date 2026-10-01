@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { registerUser, loginWithGoogle } from '../services/authService';
 import { SITE_CONFIG } from '../config/site';
-import { FiMail, FiLock, FiUser, FiPhone, FiUserPlus } from 'react-icons/fi';
+import { FiMail, FiLock, FiUser, FiPhone, FiUserPlus, FiCheckCircle } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import './AuthPages.css';
 
@@ -10,6 +10,7 @@ export default function RegisterPage() {
   const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', confirmPassword: '' });
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [showVerifyModal, setShowVerifyModal] = useState(false);
   const navigate = useNavigate();
 
   const update = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -24,8 +25,7 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await registerUser(form.email, form.password, form.name, form.phone);
-      toast.success('¡Cuenta creada! Revisá tu email para verificarla.');
-      navigate('/');
+      setShowVerifyModal(true); // Mostrar aviso de verificación en lugar de navegar
     } catch (err: any) {
       const msg = err.code === 'auth/email-already-in-use'
         ? 'Ya existe una cuenta con ese email'
@@ -52,6 +52,7 @@ export default function RegisterPage() {
   };
 
   return (
+    <>
     <div className="auth-page section">
       <div className="auth-card">
         <div className="auth-card__header">
@@ -117,5 +118,39 @@ export default function RegisterPage() {
         </div>
       </div>
     </div>
+
+      {/* Modal: revisar email de verificación */}
+      {showVerifyModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+          zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16
+        }}>
+          <div style={{
+            background: 'white', padding: 32, borderRadius: 20, maxWidth: 420, width: '100%',
+            boxShadow: 'var(--shadow-lg)', textAlign: 'center', animation: 'slideUp var(--transition-slow) ease'
+          }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>📧</div>
+            <h2 style={{ fontSize: 'var(--text-xl)', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <FiCheckCircle color="#22c55e" /> ¡Cuenta creada!
+            </h2>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-light)', marginBottom: 12, lineHeight: 1.6 }}>
+              Te enviamos un email de verificación a <strong>{form.email}</strong>.
+            </p>
+            <div style={{
+              background: '#fef9c3', border: '1px solid #fde047', borderRadius: 10,
+              padding: '12px 16px', marginBottom: 20, fontSize: 'var(--text-sm)', color: '#713f12', lineHeight: 1.6
+            }}>
+              ⚠️ <strong>¿No lo ves en tu bandeja?</strong> Revisá la carpeta de <strong>Spam</strong> o <strong>Correo no deseado</strong> — a veces termina ahí.
+            </div>
+            <button
+              className="btn btn--primary btn--full"
+              onClick={() => { setShowVerifyModal(false); navigate('/'); }}
+            >
+              Entendido, ir al inicio
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
