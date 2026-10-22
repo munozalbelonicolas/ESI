@@ -11,6 +11,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@esi-secundaria.com.ar';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || '';
+const SITE_URL = (process.env.VITE_SITE_URL || 'https://esi-secundaria.com.ar').replace(/\/$/, '');
 
 export interface OrderEmailItem {
   name?: string;
@@ -112,6 +113,10 @@ export async function sendOrderConfirmationEmail(order: OrderEmailData) {
         </div>
 
         ${shippingInfoHtml}
+
+        <div style="text-align: center; margin-top: 24px;">
+          <a href="${SITE_URL}/mis-ordenes" target="_blank" rel="noopener noreferrer" style="display: inline-block; background: #6B2D7B; color: #FFE164; padding: 12px 24px; border-radius: 8px; font-weight: bold; text-decoration: none;">Ver mis pedidos y descargar mi material</a>
+        </div>
 
         <p style="color: #666; font-size: 0.9em; margin-top: 32px; border-top: 1px solid #eee; padding-top: 16px; line-height: 1.5;">
           Si tenés alguna consulta o inconveniente, podés responder a este email o comunicarte con nosotros por WhatsApp.<br>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuthContext } from '../context/AuthContext';
 import { getUserOrders, deleteOrder } from '../services/orderService';
-import { createMPPreference } from '../services/paymentService';
+import { createMPPreference, verifyOrderPayment } from '../services/paymentService';
 import { formatPrice } from '../utils/formatPrice';
 import { formatDateShort } from '../utils/formatDate';
 import { ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS } from '../types/order';
@@ -16,16 +16,49 @@ export default function MyOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [payingId, setPayingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [verifyingId, setVerifyingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!firebaseUser) return;
     getUserOrders(firebaseUser.uid)
       .then((data) => {
         const hidden: string[] = JSON.parse(localStorage.getItem('esi_hidden_orders') || '[]');
-        setOrders(data.filter((o) => !hidden.includes(o.id)));
+        const visible = data.filter((o) => !hidden.includes(o.id));
+        setOrders(visible);
+
+        // Verificación automática en segundo plano de pedidos de MP sin acreditar
+        visible
+          .filter((o) => o.paymentMethod === 'mercadopago' && o.paymentStatus !== 'approved' && o.status !== 'cancelled')
+          .slice(0, 5)
+          .forEach((o) => {
+            verifyOrderPayment(o.id)
+              .then((s) => {
+                if (s === 'approved') {
+                  setOrders((prev) => prev.map((x) => (x.id === o.id ? { ...x, paymentStatus: 'approved', status: 'paid' } : x)));
+                }
+              })
+              .catch(() => {});
+          });
       })
       .finally(() => setLoading(false));
   }, [firebaseUser]);
+
+  const handleVerify = async (order: Order) => {
+    setVerifyingId(order.id);
+    try {
+      const s = await verifyOrderPayment(order.id);
+      if (s === 'approved') {
+        setOrders((prev) => prev.map((x) => (x.id === order.id ? { ...x, paymentStatus: 'approved', status: 'paid' } : x)));
+        toast.success('¡Pago confirmado! Ya podés descargar tu material.');
+      } else {
+        toast('Todavía no vemos el pago acreditado. Probá de nuevo en unos minutos.');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'No se pudo verificar el pago');
+    } finally {
+      setVerifyingId(null);
+    }
+  };
 
   const handlePayOrder = async (order: Order) => {
     setPayingId(order.id);
@@ -206,6 +239,16 @@ export default function MyOrdersPage() {
                         <FiTrash2 size={15} />
                         {deletingId === o.id ? 'Eliminando...' : 'Eliminar compra'}
                       </button>
+
+                      {isPendingPayment && isMP && (
+                        <button
+                          className="btn btn--outline btn--sm"
+                          onClick={() => handleVerify(o)}
+                          disabled={verifyingId === o.id}
+                        >
+                          {verifyingId === o.id ? 'Verificando...' : 'Ya pagué, verificar'}
+                        </button>
+                      )}
 
                       {isPendingPayment && (
                         <button

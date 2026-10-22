@@ -405,6 +405,11 @@ export default function CheckoutPage() {
                     </div>
                   ))}
                 </div>
+                {paymentMethod === 'mercadopago' && (
+                  <p style={{ marginTop: 16, padding: 12, background: 'var(--color-bg-alt)', borderRadius: 8, fontSize: 'var(--text-sm)' }}>
+                    ℹ️ Después de pagar en Mercado Pago, tocá <strong>«Volver al sitio»</strong> para ver tu material. Si cerrás la pestaña, entrá a <strong>Mis pedidos</strong> y tocá <strong>«Ya pagué, verificar»</strong>.
+                  </p>
+                )}
                 <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
                   <button className="btn btn--ghost" onClick={() => setStep('payment')}>← Volver</button>
                   <button className="btn btn--primary btn--full btn--lg" onClick={handleSubmit} disabled={processing}>

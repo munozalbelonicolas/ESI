@@ -1,50 +1,46 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { FiCheckCircle } from 'react-icons/fi';
-import { updateOrderStatus, updatePaymentStatus, getOrderById, updateOrderEmailSent } from '../services/orderService';
-import { sendPurchaseConfirmation } from '../services/paymentService';
+import { FiCheckCircle, FiClock } from 'react-icons/fi';
+import { verifyOrderPayment } from '../services/paymentService';
 
 export default function CheckoutSuccessPage() {
   const [params] = useSearchParams();
   const orderId = params.get('order') || params.get('external_reference');
-  const collectionStatus = params.get('collection_status') || params.get('status');
+  const [status, setStatus] = useState<'checking' | 'approved' | 'pending'>('checking');
 
   useEffect(() => {
-    // Si Mercado Pago redirige de vuelta con status approved o la orden viene especificada
-    if (orderId) {
-      if (!collectionStatus || collectionStatus === 'approved') {
-        updateOrderStatus(orderId, 'paid').catch(() => {});
-        updatePaymentStatus(orderId, 'approved').catch(() => {});
-
-        // Asegurar envío de email si el webhook aún no lo procesó o en pruebas locales
-        getOrderById(orderId)
-          .then(async (order) => {
-            if (order && !order.emailSent && order.userEmail) {
-              await updateOrderEmailSent(orderId).catch(() => {});
-              await sendPurchaseConfirmation({
-                orderId: order.id,
-                userEmail: order.userEmail,
-                userName: order.userName,
-                items: order.items || [],
-                total: order.total,
-                paymentMethod: order.paymentMethod || 'mercadopago',
-                shippingAddress: order.shippingAddress,
-                shippingMethod: order.shippingMethod,
-              }).catch((err) => console.warn('[CheckoutSuccess] Error enviando email:', err));
-            }
-          })
-          .catch(() => {});
+    if (!orderId) { setStatus('pending'); return; }
+    let cancelled = false;
+    // La verificación real la hace el servidor contra Mercado Pago (no confiamos en la URL).
+    // Reintenta unas veces porque el pago puede tardar unos segundos en acreditarse.
+    (async () => {
+      for (let i = 0; i < 4 && !cancelled; i++) {
+        try {
+          const s = await verifyOrderPayment(orderId);
+          if (s === 'approved') { if (!cancelled) setStatus('approved'); return; }
+        } catch { /* se reintenta */ }
+        await new Promise((r) => setTimeout(r, 3000));
       }
-    }
-  }, [orderId, collectionStatus]);
+      if (!cancelled) setStatus('pending');
+    })();
+    return () => { cancelled = true; };
+  }, [orderId]);
+
+  const approved = status === 'approved';
 
   return (
     <div className="section" style={{ textAlign: 'center', minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div className="container" style={{ maxWidth: 500 }}>
-        <FiCheckCircle size={72} style={{ color: 'var(--color-success)', marginBottom: 24 }} />
-        <h1 style={{ marginBottom: 8 }}>¡Compra realizada!</h1>
+        {approved
+          ? <FiCheckCircle size={72} style={{ color: 'var(--color-success)', marginBottom: 24 }} />
+          : <FiClock size={72} style={{ color: 'var(--color-text-muted)', marginBottom: 24 }} />}
+        <h1 style={{ marginBottom: 8 }}>
+          {status === 'checking' ? 'Verificando tu pago...' : approved ? '¡Compra realizada!' : 'Pedido registrado'}
+        </h1>
         <p style={{ color: 'var(--color-text-light)', marginBottom: 24, fontSize: 'var(--text-lg)' }}>
-          Tu pedido fue registrado correctamente. Te enviamos un email con los detalles.
+          {status === 'checking' && 'Estamos confirmando el pago con Mercado Pago.'}
+          {approved && 'Tu pago fue acreditado. Ya podés descargar tu material desde Mis pedidos y te enviamos un email con los detalles.'}
+          {status === 'pending' && 'Todavía no vemos el pago acreditado. Si ya pagaste, se confirma solo en unos minutos: entrá a Mis pedidos y tocá "Ya pagué, verificar".'}
         </p>
         {orderId && <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginBottom: 24 }}>Nº de orden: {orderId}</p>}
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>

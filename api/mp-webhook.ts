@@ -3,40 +3,14 @@
  * ================================================================
  * Recibe las notificaciones IPN/Webhook de Mercado Pago cuando un pago
  * cambia de estado. Actualiza la orden en Firestore directamente.
- *
- * Plan gratuito: Vercel Hobby = 100 invocaciones/día, suficiente.
+ * Si falla la escritura en Firestore responde 500 para que MP reintente.
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { MercadoPagoConfig, Payment } from 'mercadopago';
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
-import { sendOrderConfirmationEmail } from './notify-purchase';
+import { applyPaymentToOrder } from './_orderSync';
 
 const mpAccessToken = process.env.MP_ACCESS_TOKEN;
-
-// Inicializar Firebase Admin (con service account o Application Default Credentials)
-function getAdminDb() {
-  if (!getApps().length) {
-    const projectId = process.env.FIREBASE_PROJECT_ID;
-    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-    const privateKey = (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
-
-    if (projectId && clientEmail && privateKey) {
-      initializeApp({
-        credential: cert({
-          projectId,
-          clientEmail,
-          privateKey,
-        }),
-      });
-    } else {
-      // Fallback: si Vercel tiene GOOGLE_APPLICATION_Credentials en env
-      initializeApp({ projectId });
-    }
-  }
-  return getFirestore();
-}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // MP envía GET para validar el webhook, hay que responder 200 inmediatamente
@@ -49,99 +23,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { type, data } = req.body || {};
+    const body = req.body || {};
+    // Formato webhook (body.type/data.id) o IPN (query topic/id)
+    const type = body.type || req.query?.type || req.query?.topic;
+    const paymentId = body?.data?.id || req.query?.['data.id'] || req.query?.id;
 
-    // Solo procesar notificaciones de pago
-    if (type !== 'payment' || !data?.id) {
+    if (type !== 'payment' || !paymentId) {
       return res.status(200).json({ ignored: true });
     }
 
     if (!mpAccessToken) {
-      return res.status(200).json({ ignored: 'no MP token' });
+      console.error('[Webhook] MP_ACCESS_TOKEN no configurado');
+      return res.status(500).json({ error: 'no MP token' });
     }
 
     const mp = new MercadoPagoConfig({ accessToken: mpAccessToken });
-    const paymentClient = new Payment(mp);
-    const payment = await paymentClient.get({ id: String(data.id) });
+    const payment = await new Payment(mp).get({ id: String(paymentId) });
 
     if (!payment) {
       return res.status(200).json({ ignored: 'no payment found' });
     }
 
-    const orderId = (payment.metadata as any)?.orderId || '';
-
-    // Mapear estado de MP a nuestro estado
-    const mpStatus = payment.status; // approved, pending, rejected, in_process
-    let paymentStatus: 'pending' | 'approved' | 'rejected' = 'pending';
-    if (mpStatus === 'approved') paymentStatus = 'approved';
-    else if (mpStatus === 'rejected' || mpStatus === 'cancelled') paymentStatus = 'rejected';
-
-    // Actualizar la orden en Firestore
-    if (orderId) {
-      try {
-        const db = getAdminDb();
-        const orderRef = db.collection('orders').doc(orderId);
-        const orderSnap = await orderRef.get();
-
-        if (orderSnap.exists) {
-          const updates: any = {
-            paymentStatus,
-            mpPaymentId: String(payment.id),
-            updatedAt: new Date(),
-          };
-          if (paymentStatus === 'approved') {
-            updates.status = 'paid';
-            const orderData = orderSnap.data() || {};
-
-            // Decrementar stock de cada item
-            const items = orderData.items || [];
-            for (const item of items) {
-              if (item.isDigital) continue;
-              const productRef = db.collection('products').doc(item.productId);
-              const productSnap = await productRef.get();
-              if (productSnap.exists) {
-                const currentStock = productSnap.data()?.stock || 0;
-                if (currentStock !== -1) {
-                  await productRef.update({
-                    stock: Math.max(0, currentStock - item.quantity),
-                    updatedAt: new Date(),
-                  });
-                }
-              }
-            }
-
-            // Enviar email de confirmación al cliente y aviso al admin (si no fue enviado antes)
-            if (!orderData.emailSent && orderData.userEmail) {
-              try {
-                await sendOrderConfirmationEmail({
-                  orderId,
-                  userEmail: orderData.userEmail,
-                  userName: orderData.userName,
-                  items: orderData.items || [],
-                  total: orderData.total || 0,
-                  paymentMethod: 'mercadopago',
-                  shippingAddress: orderData.shippingAddress || null,
-                  shippingMethod: orderData.shippingMethod || '',
-                });
-                updates.emailSent = true;
-                console.log(`[Webhook] Notificaciones por email enviadas para orden #${orderId}`);
-              } catch (emailErr) {
-                console.error(`[Webhook] Error enviando email para orden #${orderId}:`, emailErr);
-              }
-            }
-          }
-          await orderRef.update(updates);
-          console.log(`[Webhook] Orden ${orderId} actualizada: ${paymentStatus}`);
-        }
-      } catch (dbErr) {
-        console.error('[Webhook] Error actualizando Firestore:', dbErr);
-      }
+    const orderId = payment.external_reference || (payment.metadata as any)?.orderId || '';
+    if (!orderId) {
+      return res.status(200).json({ ignored: 'no orderId' });
     }
 
-    res.status(200).json({ received: true, orderId, paymentStatus });
+    const result = await applyPaymentToOrder(orderId, String(payment.id), payment.status);
+    return res.status(200).json({ received: true, orderId, ...result });
   } catch (error: any) {
+    // 500 => Mercado Pago reintenta la notificación más tarde
     console.error('[Webhook] Error:', error.message || error);
-    // Responder 200 para que MP no reintente infinitamente
-    res.status(200).json({ error: 'processed_with_errors' });
+    return res.status(500).json({ error: 'processing_failed' });
   }
 }

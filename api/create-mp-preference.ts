@@ -107,6 +107,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       payer: {
         email: email || 'test_user_1234567@testuser.com',
       },
+      external_reference: orderId || undefined,
       metadata: {
         orderId: orderId || '',
       },

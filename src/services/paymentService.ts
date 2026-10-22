@@ -9,6 +9,7 @@
  */
 
 import type { OrderItem, ShippingAddress } from '../types/order';
+import { auth } from '../config/firebase';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 
@@ -64,6 +65,26 @@ export async function createMPPreference(
   }
 
   return res.json();
+}
+
+/**
+ * Verifica contra Mercado Pago el estado real de una orden (lo hace el servidor)
+ * y devuelve el paymentStatus resultante.
+ */
+export async function verifyOrderPayment(orderId: string): Promise<'pending' | 'approved' | 'rejected'> {
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('Iniciá sesión para verificar tu pago');
+  const res = await fetch(`${API_BASE}/api/verify-payment`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ orderId }),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'No se pudo verificar el pago');
+  }
+  const data = await res.json();
+  return data.paymentStatus;
 }
 
 /**
