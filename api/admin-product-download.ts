@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminDb, requireUser } from './_admin.ts';
 import { handleApiCors } from './_cors.ts';
+import { migrateProductDownloads } from './_migrateProductDownloads.ts';
 
 function validHttpsUrl(value: unknown): string | null {
   if (typeof value !== 'string' || value.length > 2048) return null;
@@ -14,6 +15,8 @@ function validHttpsUrl(value: unknown): string | null {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // /api/admin-migrate-product-downloads se reescribe a ?action=migrate (límite de 12 funciones en Hobby)
+  if (req.query?.action === 'migrate') return migrateProductDownloads(req, res);
   if (handleApiCors(req, res, ['GET', 'POST', 'DELETE'])) return;
   if (req.method !== 'GET' && req.method !== 'POST' && req.method !== 'DELETE') {
     return res.status(405).json({ error: 'Method not allowed' });

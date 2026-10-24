@@ -4,7 +4,7 @@ import { getAdminDb, requireUser } from './_admin.ts';
 import { handleApiCors } from './_cors.ts';
 
 /** One-time admin migration: move legacy URLs out of publicly readable product documents. */
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export async function migrateProductDownloads(req: VercelRequest, res: VercelResponse) {
   if (handleApiCors(req, res, ['POST'])) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 

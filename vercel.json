@@ -18,6 +18,14 @@
   },
   "rewrites": [
     {
+      "source": "/api/admin-migrate-product-downloads",
+      "destination": "/api/admin-product-download?action=migrate"
+    },
+    {
+      "source": "/api/get-free-product-download",
+      "destination": "/api/get-digital-download?action=free"
+    },
+    {
       "source": "/((?!api/|assets/).*)",
       "destination": "/index.html"
     }

@@ -8,6 +8,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getAdminDb, requireUser } from './_admin.ts';
+import { freeProductDownload } from './_freeProductDownload.ts';
 
 function allowedOrigins(): string[] {
   const site = (process.env.VITE_SITE_URL || '').replace(/\/$/, '');
@@ -15,6 +16,9 @@ function allowedOrigins(): string[] {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // /api/get-free-product-download se reescribe a ?action=free (límite de 12 funciones en Hobby)
+  if (req.query?.action === 'free') return freeProductDownload(req, res);
+
   const origin = String(req.headers.origin || '');
   if (origin && allowedOrigins().includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
