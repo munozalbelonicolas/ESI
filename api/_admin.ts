@@ -43,7 +43,9 @@ export async function requireUser(
       emailVerified: decoded.email_verified === true,
       isAdmin: userSnap.data()?.role === 'admin',
     };
-  } catch {
+  } catch (error: any) {
+    // Solo código y mensaje: nunca el token. Sin esto, credenciales rotas se ven como un 401/403.
+    console.error('[Auth] requireUser falló:', error?.code || 'sin-codigo', error?.message || error);
     return null;
   }
 }
