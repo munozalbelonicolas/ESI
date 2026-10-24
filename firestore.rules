@@ -58,11 +58,8 @@ service cloud.firestore {
       allow update: if isAdmin()
         || (isAuth() && resource.data.userId == request.auth.uid
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['transferProofUrl', 'updatedAt']));
-      // El dueño solo puede borrar pedidos no pagados; el admin puede borrar cualquiera
-      allow delete: if isAdmin()
-        || (isAuth() && resource.data.userId == request.auth.uid
-            && resource.data.paymentStatus != 'approved'
-            && resource.data.status == 'pending');
+      // Solo admins. El cliente cancela vía /api/cancel-order, que libera la reserva de cupón.
+      allow delete: if isAdmin();
     }
 
     // ── Transfer Proofs (comprobantes de pago por transferencia) ──
@@ -85,8 +82,8 @@ service cloud.firestore {
 
     // ── Coupons ──
     match /coupons/{couponId} {
-      // Los visitantes solo pueden consultar cupones activos; los admins gestionan todos.
-      allow read: if isAdmin() || resource.data.isActive == true;
+      // Solo admins: el checkout valida cupones vía /api/validate-coupon para no exponer los códigos.
+      allow read: if isAdmin();
       // Solo admins pueden escribir
       allow create: if isAdmin();
       allow update: if isAdmin()

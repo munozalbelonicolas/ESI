@@ -121,6 +121,13 @@ describe('Reglas Firestore para el catálogo público', () => {
     );
   });
 
+  it('deniega listar cupones desde el navegador, aunque estén activos', async () => {
+    await assert.rejects(
+      getDocs(query(collection(db, 'coupons'), where('isActive', '==', true))),
+      (error) => error.code === 'permission-denied'
+    );
+  });
+
   it('deniega leer o modificar reservas de cupones desde el navegador', async () => {
     await assert.rejects(getDoc(doc(db, 'couponReservations', fixturePrefix)),
       (error) => error.code === 'permission-denied');

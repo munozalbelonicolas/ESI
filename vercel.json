@@ -22,6 +22,10 @@
       "destination": "/api/admin-product-download?action=migrate"
     },
     {
+      "source": "/api/validate-coupon",
+      "destination": "/api/create-order?action=validate-coupon"
+    },
+    {
       "source": "/api/get-free-product-download",
       "destination": "/api/get-digital-download?action=free"
     },

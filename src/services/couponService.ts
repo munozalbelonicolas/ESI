@@ -6,52 +6,41 @@ import {
   updateDoc,
   deleteDoc,
   query,
-  where,
-  limit,
   Timestamp,
   orderBy,
 } from 'firebase/firestore';
-import { db } from '../config/firebase';
-import type { Coupon, CouponFormData } from '../types/coupon';
+import { auth, db } from '../config/firebase';
+import type { AppliedCoupon, Coupon, CouponFormData } from '../types/coupon';
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 
 const COLLECTION = 'coupons';
 
 /**
- * Valida y aplica un cupón de descuento.
- * Retorna el cupón si es válido, o null si no lo es.
+ * Valida un cupón contra el backend (la colección /coupons solo es legible por admins).
+ * Retorna los datos para calcular el descuento, o null si no es válido.
  */
 export async function validateCoupon(
   code: string,
   purchaseTotal: number
-): Promise<Coupon | null> {
-  const q = query(
-    collection(db, COLLECTION),
-    where('code', '==', code.toUpperCase()),
-    where('isActive', '==', true),
-    limit(1)
-  );
-
-  const snap = await getDocs(q);
-  if (snap.empty) return null;
-
-  const coupon = { id: snap.docs[0].id, ...snap.docs[0].data() } as Coupon;
-
-  // Verificar si expiró
-  if (coupon.expiresAt && coupon.expiresAt.toMillis() < Date.now()) return null;
-
-  // Verificar usos máximos
-  if (coupon.maxUses > 0 && coupon.usedCount + Number((coupon as any).reservedCount || 0) >= coupon.maxUses) return null;
-
-  // Verificar compra mínima
-  if (purchaseTotal < coupon.minPurchase) return null;
-
-  return coupon;
+): Promise<AppliedCoupon | null> {
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('No autenticado');
+  const response = await fetch(`${API_BASE}/api/validate-coupon`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ code, subtotal: purchaseTotal }),
+  });
+  if (response.status === 404) return null;
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || 'No se pudo validar el cupón');
+  return result as AppliedCoupon;
 }
 
 /**
  * Calcula el descuento según el tipo de cupón.
  */
-export function calculateDiscount(coupon: Coupon, subtotal: number): number {
+export function calculateDiscount(coupon: AppliedCoupon, subtotal: number): number {
   if (coupon.type === 'percentage') {
     return Math.round((subtotal * coupon.value) / 100);
   }

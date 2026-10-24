@@ -14,7 +14,7 @@ import { trackBeginCheckout, trackPurchase } from '../config/analytics';
 import { onPurchaseComplete } from '../services/subscriptionHook';
 import { PROVINCES } from '../config/site';
 import type { PaymentMethod, ShippingAddress } from '../types/order';
-import type { Coupon } from '../types/coupon';
+import type { AppliedCoupon } from '../types/coupon';
 import { FiTruck, FiCreditCard, FiUpload, FiCheck, FiTag, FiCopy, FiInfo } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import './CheckoutPage.css';
@@ -33,7 +33,7 @@ export default function CheckoutPage() {
   const [bankDetails, setBankDetails] = useState<BankDetails | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [couponCode, setCouponCode] = useState('');
-  const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
   const [transferFile, setTransferFile] = useState<File | null>(null);
   const [processing, setProcessing] = useState(false);
 
@@ -87,7 +87,13 @@ export default function CheckoutPage() {
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) return;
-    const coupon = await validateCoupon(couponCode, subtotal);
+    let coupon: AppliedCoupon | null;
+    try {
+      coupon = await validateCoupon(couponCode, subtotal);
+    } catch (error: any) {
+      toast.error(error?.message || 'No se pudo validar el cupón');
+      return;
+    }
     if (coupon) {
       setAppliedCoupon(coupon);
       toast.success(`¡Cupón aplicado! ${coupon.type === 'percentage' ? coupon.value + '%' : formatPrice(coupon.value)} de descuento`);

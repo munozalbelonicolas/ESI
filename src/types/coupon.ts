@@ -16,6 +16,9 @@ export interface Coupon {
   createdAt: Timestamp;
 }
 
+/** Lo que devuelve /api/validate-coupon: solo lo necesario para mostrar el descuento. */
+export type AppliedCoupon = Pick<Coupon, 'code' | 'type' | 'value'>;
+
 export interface CouponFormData {
   code: string;
   type: CouponType;

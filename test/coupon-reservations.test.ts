@@ -40,11 +40,11 @@ after(async () => {
 });
 
 it('solo reserva un último uso bajo solicitudes simultáneas y permite reutilizarlo tras liberar', async () => {
-  const attempts = await Promise.all(Array.from({ length: 8 }, async () => {
+  const attempts = await Promise.all(Array.from({ length: 8 }, async (_, i) => {
     const orderRef = db.collection('orders').doc();
     try {
       await db.runTransaction(async (transaction) => {
-        await reserveCoupon(db, transaction, orderRef, couponCode, 100, 'mercadopago');
+        await reserveCoupon(db, transaction, orderRef, couponCode, 100, 'mercadopago', `user-${i}`);
         transaction.create(orderRef, { testId, couponReservationId: orderRef.id });
       });
       return orderRef;
@@ -71,7 +71,7 @@ it('solo reserva un último uso bajo solicitudes simultáneas y permite reutiliz
 
   const replacement = db.collection('orders').doc();
   await db.runTransaction(async (transaction) => {
-    await reserveCoupon(db, transaction, replacement, couponCode, 100, 'transfer');
+    await reserveCoupon(db, transaction, replacement, couponCode, 100, 'transfer', 'user-replacement');
     transaction.create(replacement, { testId, couponReservationId: replacement.id });
   });
   await db.runTransaction(async (transaction) => {
@@ -84,7 +84,33 @@ it('solo reserva un último uso bajo solicitudes simultáneas y permite reutiliz
   assert.equal(coupon?.reservedCount, 0);
   assert.equal(coupon?.usedCount, 1);
   await assert.rejects(
-    db.runTransaction(async (transaction) => reserveCoupon(db, transaction, db.collection('orders').doc(), couponCode, 100, 'transfer')),
+    db.runTransaction(async (transaction) => reserveCoupon(db, transaction, db.collection('orders').doc(), couponCode, 100, 'transfer', 'user-late')),
     (error: any) => error?.message === 'COUPON_UNAVAILABLE'
   );
+});
+
+it('no permite que un mismo usuario acumule reservas del mismo cupón', async () => {
+  const multiRef = db.collection('coupons').doc(`${testId}-multi`);
+  const multiCode = `MULTI-${Date.now()}`;
+  await multiRef.set({
+    code: multiCode, type: 'fixed', value: 10, isActive: true,
+    maxUses: 10, usedCount: 0, reservedCount: 0, minPurchase: 0,
+  });
+  const reserve = (userId: string) => db.runTransaction(async (transaction) => {
+    const orderRef = db.collection('orders').doc();
+    await reserveCoupon(db, transaction, orderRef, multiCode, 100, 'transfer', userId);
+    transaction.create(orderRef, { testId, couponReservationId: orderRef.id });
+  });
+  try {
+    await reserve('same-user');
+    await assert.rejects(reserve('same-user'), (error: any) => error?.message === 'COUPON_ALREADY_RESERVED');
+    await reserve('other-user');
+    assert.equal((await multiRef.get()).data()?.reservedCount, 2);
+  } finally {
+    const leftovers = await db.collection('couponReservations').where('couponId', '==', multiRef.id).get();
+    const batch = db.batch();
+    leftovers.docs.forEach((doc) => batch.delete(doc.ref));
+    batch.delete(multiRef);
+    await batch.commit();
+  }
 });

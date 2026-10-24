@@ -2,13 +2,36 @@ import type { Transaction, DocumentReference, Firestore } from 'firebase-admin/f
 
 export const COUPON_RESERVATION_MS = 24 * 60 * 60 * 1000;
 
+/** Reglas de elegibilidad compartidas entre la validación del checkout y la reserva. */
+export function isCouponEligible(coupon: FirebaseFirestore.DocumentData, subtotal: unknown, now = Date.now()): boolean {
+  const expiresAt = coupon.expiresAt?.toMillis?.();
+  const maxUses = Number(coupon.maxUses || 0);
+  const usedCount = Number(coupon.usedCount || 0);
+  const reservedCount = Number(coupon.reservedCount || 0);
+  const value = Number(coupon.value);
+  const couponConfigurationValid =
+    (coupon.type === 'percentage' && Number.isFinite(value) && value > 0 && value <= 100) ||
+    (coupon.type === 'fixed' && Number.isFinite(value) && value > 0);
+  return !(
+    coupon.isActive !== true ||
+    !couponConfigurationValid ||
+    !Number.isInteger(maxUses) || maxUses < 0 ||
+    !Number.isInteger(usedCount) || usedCount < 0 ||
+    !Number.isInteger(reservedCount) || reservedCount < 0 ||
+    (Number.isFinite(expiresAt) && expiresAt <= now) ||
+    Number(subtotal) < Number(coupon.minPurchase || 0) ||
+    (maxUses > 0 && usedCount + reservedCount >= maxUses)
+  );
+}
+
 export async function reserveCoupon(
   db: Firestore,
   transaction: Transaction,
   orderRef: DocumentReference,
   couponCode: unknown,
   subtotal: unknown,
-  paymentMethod: unknown
+  paymentMethod: unknown,
+  userId: string
 ): Promise<{ couponCode: string | null; reservationId: string | null; couponDiscount: number }> {
   if (typeof couponCode !== 'string' || !couponCode.trim()) {
     return { couponCode: null, reservationId: null, couponDiscount: 0 };
@@ -21,26 +44,19 @@ export async function reserveCoupon(
   const couponDoc = couponSnap.docs[0];
   const coupon = couponDoc.data();
   const now = Date.now();
-  const expiresAt = coupon.expiresAt?.toMillis?.();
-  const maxUses = Number(coupon.maxUses || 0);
-  const usedCount = Number(coupon.usedCount || 0);
   const reservedCount = Number(coupon.reservedCount || 0);
   const value = Number(coupon.value);
-  const couponConfigurationValid =
-    (coupon.type === 'percentage' && Number.isFinite(value) && value > 0 && value <= 100) ||
-    (coupon.type === 'fixed' && Number.isFinite(value) && value > 0);
-  if (
-    coupon.isActive !== true ||
-    !couponConfigurationValid ||
-    !Number.isInteger(maxUses) || maxUses < 0 ||
-    !Number.isInteger(usedCount) || usedCount < 0 ||
-    !Number.isInteger(reservedCount) || reservedCount < 0 ||
-    (Number.isFinite(expiresAt) && expiresAt <= now) ||
-    Number(subtotal) < Number(coupon.minPurchase || 0) ||
-    (maxUses > 0 && usedCount + reservedCount >= maxUses)
-  ) {
-    throw new Error('COUPON_UNAVAILABLE');
-  }
+  if (!isCouponEligible(coupon, subtotal, now)) throw new Error('COUPON_UNAVAILABLE');
+
+  // Un usuario no puede acumular reservas del mismo cupón: evita agotar maxUses con pedidos pendientes.
+  const activeReservation = await transaction.get(
+    db.collection('couponReservations')
+      .where('userId', '==', userId)
+      .where('couponId', '==', couponDoc.id)
+      .where('status', '==', 'reserved')
+      .limit(1)
+  );
+  if (!activeReservation.empty) throw new Error('COUPON_ALREADY_RESERVED');
 
   const reservationId = orderRef.id;
   const reservationRef = db.collection('couponReservations').doc(reservationId);
@@ -49,6 +65,7 @@ export async function reserveCoupon(
     : null;
   transaction.create(reservationRef, {
     orderId: orderRef.id,
+    userId,
     couponId: couponDoc.id,
     couponCode: normalizedCode,
     status: 'reserved',

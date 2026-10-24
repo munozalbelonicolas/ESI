@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getAdminDb, requireUser } from './_admin.js';
-import { reserveCoupon } from './_couponReservations.js';
+import { isCouponEligible, reserveCoupon } from './_couponReservations.js';
 import { calculateOrderShippingCost, isValidShippingZipCode } from './_shipping.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -8,6 +8,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const user = await requireUser(req);
     if (!user) return res.status(401).json({ error: 'No autenticado' });
+    // /api/validate-coupon se reescribe a ?action=validate-coupon (límite de 12 funciones en Hobby)
+    if (req.query?.action === 'validate-coupon') return validateCoupon(req, res);
     if (!user.emailVerified) return res.status(403).json({ error: 'Verificá tu email antes de comprar' });
 
     const data = req.body || {};
@@ -100,7 +102,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     };
     await db.runTransaction(async (transaction) => {
       const reservation = await reserveCoupon(
-        db, transaction, orderRef, orderData.couponCode, orderData.subtotal, orderData.paymentMethod
+        db, transaction, orderRef, orderData.couponCode, orderData.subtotal, orderData.paymentMethod, user.uid
       );
       const discount = Math.min(subtotal, reservation.couponDiscount + transferDiscount);
       transaction.create(orderRef, {
@@ -116,8 +118,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (error?.message === 'COUPON_INVALID' || error?.message === 'COUPON_UNAVAILABLE') {
       return res.status(409).json({ error: 'El cupón ya no está disponible. Actualizá el carrito e intentá nuevamente.' });
     }
+    if (error?.message === 'COUPON_ALREADY_RESERVED') {
+      return res.status(409).json({ error: 'Ya tenés un pedido pendiente con este cupón. Cancelalo desde "Mis pedidos" para volver a usarlo.' });
+    }
     if (error?.message === 'SHIPPING_INVALID') return res.status(400).json({ error: 'Datos de envío inválidos' });
     console.error('[CreateOrder] Error:', error?.message || error);
     return res.status(500).json({ error: 'No se pudo crear el pedido' });
+  }
+}
+
+/** Vista previa del cupón para el checkout: la lectura directa de /coupons es solo para admins. */
+async function validateCoupon(req: VercelRequest, res: VercelResponse) {
+  const code = req.body?.code;
+  if (typeof code !== 'string' || !code.trim() || code.length > 64) {
+    return res.status(400).json({ error: 'Código de cupón requerido' });
+  }
+  try {
+    const snap = await getAdminDb().collection('coupons')
+      .where('code', '==', code.trim().toUpperCase())
+      .limit(1)
+      .get();
+    const coupon = snap.empty ? null : snap.docs[0].data();
+    if (!coupon || !isCouponEligible(coupon, req.body?.subtotal)) {
+      return res.status(404).json({ error: 'Cupón inválido, expirado o no cumple el monto mínimo' });
+    }
+    // Solo lo necesario para calcular el descuento en pantalla; el total real se recalcula al crear el pedido.
+    return res.status(200).json({ code: coupon.code, type: coupon.type, value: Number(coupon.value) });
+  } catch (error: any) {
+    console.error('[ValidateCoupon] Error:', error?.message || error);
+    return res.status(500).json({ error: 'No se pudo validar el cupón' });
   }
 }
