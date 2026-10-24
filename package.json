@@ -10,7 +10,9 @@
     "lint": "eslint . --ext .ts,.tsx",
     "lint:fix": "eslint . --ext .ts,.tsx --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\""
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\"",
+    "test": "node --experimental-strip-types --test test/security.test.ts",
+    "test:local": "firebase emulators:exec --config firebase.payment-test.json --only auth,firestore --project demo-esi-local \"node --experimental-strip-types --test --test-concurrency=1 test/security.test.ts test/payment-flow.test.ts test/coupon-reservations.test.ts test/firestore-rules.test.mjs\""
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -19,6 +21,7 @@
     "@types/react-dom": "^19.2.3",
     "@typescript-eslint/eslint-plugin": "^8.65.0",
     "@typescript-eslint/parser": "^8.65.0",
+    "@vercel/node": "^5.10.2",
     "eslint": "^10.8.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react": "^7.37.5",
@@ -28,17 +31,21 @@
     "vite": "^8.1.1"
   },
   "dependencies": {
-    "@vercel/node": "^5.9.3",
     "chart.js": "^4.5.1",
+    "dompurify": "^3.4.17",
     "firebase": "^12.16.0",
     "firebase-admin": "^14.2.0",
     "mercadopago": "^3.2.1",
+    "quill": "^2.0.2",
     "react": "^19.2.8",
     "react-chartjs-2": "^5.3.1",
     "react-dom": "^19.2.8",
     "react-hot-toast": "^2.6.0",
     "react-icons": "^5.7.0",
-    "react-quill-new": "^3.8.3",
+    "react-quill-new": "^3.7.0",
     "react-router-dom": "^7.18.2"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "1.14.6"
   }
 }

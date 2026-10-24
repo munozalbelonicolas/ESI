@@ -94,55 +94,6 @@ export async function saveShippingSettings(settings: ShippingSettings): Promise<
   cachedSettings = settings;
 }
 
-/**
- * Llama a la API oficial de Correo Argentino (Paq.ar / MiCorreo) para cotización en vivo.
- */
-async function fetchCorreoArgentinoApi(
-  originZip: string,
-  destZip: string,
-  weightGrams: number,
-  customerId: string,
-  token: string
-): Promise<ShippingQuote[]> {
-  const url = `https://api.correoargentino.com.ar/paqar/v1/rates/calculate`;
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-      'X-Customer-ID': customerId,
-    },
-    body: JSON.stringify({
-      originPostalCode: originZip,
-      destinationPostalCode: destZip,
-      weightGrams: weightGrams,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`API Correo Argentino respondió con estado ${response.status}`);
-  }
-
-  const data = await response.json();
-  // Formatear la respuesta de la API a nuestras opciones de envío
-  if (Array.isArray(data.rates) && data.rates.length > 0) {
-    return data.rates.map((r: any) => ({
-      id: `correo-api-${r.code || r.serviceType}`,
-      name: r.name || 'Correo Argentino',
-      description: r.description || 'Cotización en vivo Correo Argentino',
-      price: Math.round(r.price || r.amount),
-      estimatedDays: r.estimatedDays ? `${r.estimatedDays} días hábiles` : '3 a 6 días hábiles',
-      type: r.serviceType === 'sucursal' ? 'sucursal' : 'domicilio',
-      provider: 'Correo Argentino',
-    }));
-  }
-
-  throw new Error('La API de Correo Argentino no devolvió cotizaciones válidas');
-}
-
-/**
- * Determina la tarifa según el peso total acumulado en gramos (Tabla de Respaldo).
- */
 function getRateByWeight(rates: ZoneWeightRates, weightGrams: number): number {
   if (weightGrams <= 1000) return rates.w1kg;
   if (weightGrams <= 5000) return rates.w5kg;
@@ -151,17 +102,13 @@ function getRateByWeight(rates: ZoneWeightRates, weightGrams: number): number {
   if (weightGrams <= 20000) return rates.w20kg;
   if (weightGrams <= 25000) return rates.w25kg;
 
-  const extraKgos = Math.ceil((weightGrams - 25000) / 1000);
-  return Math.round(rates.w25kg + extraKgos * 2500);
+  const extraKilos = Math.ceil((weightGrams - 25000) / 1000);
+  return Math.round(rates.w25kg + extraKilos * 2500);
 }
 
-/**
- * Determina la zona postal oficial (Regional vs Nacional) del código postal argentino.
- */
 function getZoneFromZip(zipCode: string): 'regional' | 'nacional' {
   const code = parseInt(zipCode, 10);
   if (isNaN(code)) return 'nacional';
-
   if (
     (code >= 1000 && code < 3100) ||
     (code >= 5000 && code < 6000) ||
@@ -169,51 +116,48 @@ function getZoneFromZip(zipCode: string): 'regional' | 'nacional' {
   ) {
     return 'regional';
   }
-
   return 'nacional';
 }
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+
 /**
- * Cotiza opciones de envío con Correo Argentino.
- * Si la API en vivo está activa y configurada, consulta la API. Si falla, pasa a la tabla de respaldo.
- *
- * @param zipCode - Código postal argentino de destino (4 dígitos)
- * @param totalWeight - Peso total acumulado del paquete en gramos (default: 500g)
- * @param customOverridePrice - Costo fijo opcional si el admin lo sobreescribe
+ * Cotiza opciones de envío con Correo Argentino a través de la API Serverless segura.
+ * Si el backend no está disponible (ej. pruebas offline), utiliza la matriz de respaldo local.
  */
 export async function getShippingQuotes(
   zipCode: string,
   totalWeight: number = 500,
   customOverridePrice?: number | null
 ): Promise<ShippingQuote[]> {
-  const settings = await getShippingSettings();
-
-  // Intento 1: Si la API en vivo está activada y tiene credenciales
-  if (
-    settings.useLiveApi &&
-    settings.apiToken &&
-    settings.apiCustomerId
-  ) {
-    try {
-      const liveQuotes = await fetchCorreoArgentinoApi(
-        settings.originZipCode || '1425',
-        zipCode,
-        totalWeight,
-        settings.apiCustomerId,
-        settings.apiToken
-      );
-      if (liveQuotes && liveQuotes.length > 0) {
-        return liveQuotes;
-      }
-    } catch (err) {
-      console.warn('[shippingService] Fallo la cotización en vivo con API Correo Argentino. Usando tabla de respaldo:', err);
-    }
+  if (!isValidShippingZipCode(zipCode)) {
+    throw new Error('Código postal argentino inválido (debe tener 4 dígitos)');
   }
 
-  // Intento 2 / Fallback: Usar la matriz tarifaria oficial de respaldo
-  const zoneKey = getZoneFromZip(zipCode);
-  const zoneRates = settings[zoneKey] || DEFAULT_SHIPPING_SETTINGS.regional;
+  // 1. Intento principal: servidor seguro /api/quote-shipping (maneja credenciales y API en vivo)
+  try {
+    const res = await fetch(`${API_BASE}/api/quote-shipping`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        zipCode,
+        weightGrams: totalWeight,
+        customOverridePrice,
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.quotes) && data.quotes.length > 0) {
+        return data.quotes;
+      }
+    }
+  } catch (err) {
+    console.warn('[shippingService] Endpoint /api/quote-shipping no disponible, usando tarifas locales de respaldo:', err);
+  }
 
+  // 2. Respaldo local si el endpoint no responde
+  const zoneKey = getZoneFromZip(zipCode);
+  const zoneRates = DEFAULT_SHIPPING_SETTINGS[zoneKey] || DEFAULT_SHIPPING_SETTINGS.regional;
   let basePrice = getRateByWeight(zoneRates, totalWeight);
 
   if (customOverridePrice && customOverridePrice > 0) {

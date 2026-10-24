@@ -107,25 +107,45 @@ Tienda/
 ### Requisitos
 - Node.js 20+
 - npm 10+
+- Java 21 y Firebase CLI para ejecutar Firestore Emulator
+- Vercel CLI para ejecutar las funciones reales de `/api`
 
 ### Pasos
 
-```bash
-# 1. Instalar dependencias
-npm install --legacy-peer-deps
+No uses credenciales de producción para desarrollar. La aplicación exige el emulador cuando corre en modo desarrollo.
 
-# 2. Copiar .env.example a .env y completar
-cp .env.example .env
-# Editar .env con las credenciales reales
+1. Instalar dependencias y copiar la configuración local segura:
 
-# 3. Correr en desarrollo
-npm run dev
-# Abre en http://localhost:5173
+   ```powershell
+   npm install --legacy-peer-deps
+   Copy-Item .env.development.local.example .env.development.local
+   ```
 
-# 4. Build de producción
-npm run build
-# Output en dist/
-```
+2. Iniciar Auth, Firestore, Storage y Emulator UI en una terminal:
+
+   ```powershell
+   firebase emulators:start --only auth,firestore,storage --project demo-esi-local
+   ```
+
+3. En otra terminal, apuntar Firebase Admin al emulador y levantar Vercel local:
+
+   ```powershell
+   $env:GCLOUD_PROJECT = 'demo-esi-local'
+   $env:FIREBASE_PROJECT_ID = 'demo-esi-local'
+   $env:FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080'
+   $env:FIREBASE_AUTH_EMULATOR_HOST = '127.0.0.1:9099'
+   vercel dev --listen 3000
+   ```
+
+4. Abrir `http://localhost:3000` y Emulator UI en `http://127.0.0.1:4000`. Crear ahí usuarios/documentos de prueba. Solo para pagos, configurar en esa terminal credenciales de prueba de Mercado Pago; no agregar `RESEND_API_KEY` para evitar envíos reales.
+
+5. Para compilar la versión de producción sin desplegar:
+
+   ```powershell
+   npm run build
+   ```
+
+Las funciones reales de `/api` se prueban con `vercel dev`; no uses la antigua ruta de pago integrada en Vite. El modo local requiere un `VITE_FIREBASE_PROJECT_ID` que empiece con `demo-` y la variable explícita `VITE_USE_FIREBASE_EMULATOR=true`.
 
 ---
 
@@ -154,6 +174,7 @@ npm run build
 | Variable                     | Descripción                                    |
 |------------------------------|------------------------------------------------|
 | `MP_ACCESS_TOKEN`            | Access Token de Mercado Pago (server-side)     |
+| `MP_WEBHOOK_SECRET`           | Secreto de firma de notificaciones de Mercado Pago (obligatorio) |
 | `RESEND_API_KEY`             | API Key de Resend para emails                  |
 | `FROM_EMAIL`                 | Email remitente (ej: noreply@esi-secundaria.com) |
 | `ADMIN_EMAIL`                | Email del admin para notificaciones            |
@@ -161,6 +182,8 @@ npm run build
 | `FIREBASE_CLIENT_EMAIL`      | Email del service account                      |
 | `FIREBASE_PRIVATE_KEY`       | Private key (con \n escapados)                 |
 | `LOW_STOCK_THRESHOLD`        | Umbral de stock bajo (default: 5)              |
+
+Las variables `FIRESTORE_EMULATOR_HOST` y `FIREBASE_AUTH_EMULATOR_HOST` se configuran solo en la terminal local según los pasos anteriores. Nunca las agregues al entorno de producción.
 
 ---
 
@@ -175,7 +198,19 @@ npm run build
 5. Configurar todas las env vars en Vercel Dashboard
 6. `git push` → deploy automático
 
-Las 4 API routes en `/api/` se deployan automáticamente como serverless functions.
+Las API routes en `/api/` se deployan automáticamente como serverless functions.
+
+### Migración segura de enlaces digitales existentes
+
+Los enlaces antiguos guardados en `products.digitalFileUrl` deben migrarse antes de publicar las nuevas reglas de Firestore. La regla pública bloquea los documentos que todavía contengan ese campo.
+
+1. Configurar `MP_WEBHOOK_SECRET` en Vercel antes de publicar el nuevo webhook. Si falta, el endpoint responde 503 y no procesa pagos.
+2. Publicar la aplicación/API, manteniendo temporalmente las reglas de Firestore actuales.
+3. Iniciar sesión como administrador y abrir **Admin > Productos**. Usar **Proteger enlaces antiguos** y confirmar el resultado. Corregir enlaces inválidos desde el editor de cada producto hasta que la migración indique cero pendientes.
+4. Confirmar que los enlaces estén en `productDownloads` y que ningún documento de `products` conserve `digitalFileUrl`.
+5. Publicar `firestore.rules` con `firebase deploy --only firestore:rules`.
+
+No publicar las reglas nuevas antes de completar la migración: la tienda bloqueará las consultas públicas mientras quede algún documento de producto con el campo legado. Los permisos de origen de los archivos también deben impedir el acceso público directo a materiales pagos; ocultar una URL no revoca enlaces que ya se compartieron.
 
 ### Opción B: Firebase Hosting
 

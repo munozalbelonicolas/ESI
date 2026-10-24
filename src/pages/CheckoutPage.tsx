@@ -3,11 +3,11 @@ import { useNavigate, Navigate } from 'react-router-dom';
 import { useCartContext } from '../context/CartContext';
 import { useAuthContext } from '../context/AuthContext';
 import { createOrder } from '../services/orderService';
-import { validateCoupon, calculateDiscount, incrementCouponUsage } from '../services/couponService';
+import { validateCoupon, calculateDiscount } from '../services/couponService';
 import { getShippingQuotes, type ShippingQuote } from '../services/shippingService';
 import { getBankDetails, type BankDetails } from '../services/bankService';
 import { uploadTransferProof } from '../services/storageService';
-import { saveTransferProof, updateOrderEmailSent } from '../services/orderService';
+import { saveTransferProof } from '../services/orderService';
 import { createMPPreference, sendPurchaseConfirmation } from '../services/paymentService';
 import { formatPrice } from '../utils/formatPrice';
 import { trackBeginCheckout, trackPurchase } from '../config/analytics';
@@ -112,15 +112,12 @@ export default function CheckoutPage() {
         items: items.map(i => ({
           productId: i.product.id, name: i.product.name, price: i.product.price,
           quantity: i.quantity, isDigital: i.product.isDigital, image: i.product.images[0] || '',
-          downloadUrl: i.product.isDigital ? (i.product.digitalFileUrl || null) : null,
         })),
         subtotal, discount, couponCode: appliedCoupon?.code || null,
         shippingCost, shippingMethod: selectedShipping?.name || 'Digital',
         shippingAddress: hasDigitalOnly ? null : address,
         total, paymentMethod,
       });
-
-      if (appliedCoupon) await incrementCouponUsage(appliedCoupon.id);
 
       if (paymentMethod === 'transfer' && transferFile) {
         const proofUrl = await uploadTransferProof(transferFile, orderId);
@@ -129,12 +126,7 @@ export default function CheckoutPage() {
 
       if (paymentMethod === 'mercadopago') {
         try {
-          const pref = await createMPPreference(
-            orderId,
-            items.map(i => ({ productId: i.product.id, name: i.product.name, price: i.product.price, quantity: i.quantity, isDigital: i.product.isDigital, image: i.product.images[0] || '' })),
-            firebaseUser.email || '',
-            shippingCost, discount
-          );
+          const pref = await createMPPreference(orderId);
           const redirectUrl = pref.initPoint || pref.sandboxInitPoint;
           if (redirectUrl) {
             clearCart();
@@ -153,7 +145,7 @@ export default function CheckoutPage() {
       trackPurchase(orderId, total, items.map(i => ({ item_id: i.product.id, item_name: i.product.name, price: i.product.price, quantity: i.quantity })), paymentMethod);
       await onPurchaseComplete({ userId: firebaseUser.uid, email: firebaseUser.email || '', type: 'purchase', productIds: items.map(i => i.product.id), timestamp: new Date() });
 
-      // Enviar email de confirmación al cliente y aviso al admin
+      // Enviar email de aviso al cliente y admin (sin entregar descargas si no está aprobado)
       await sendPurchaseConfirmation({
         orderId,
         userEmail: firebaseUser.email || '',
@@ -165,14 +157,13 @@ export default function CheckoutPage() {
           quantity: i.quantity,
           isDigital: i.product.isDigital,
           image: i.product.images[0] || '',
-          downloadUrl: i.product.isDigital ? (i.product.digitalFileUrl || null) : null,
         })),
         total,
         paymentMethod,
         shippingAddress: hasDigitalOnly ? null : address,
         shippingMethod: selectedShipping?.name || 'Digital',
       });
-      await updateOrderEmailSent(orderId).catch(() => {});
+
 
       clearCart();
       navigate(`/checkout/exito?order=${orderId}`);

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getAllOrders, updateOrderStatus, updatePaymentStatus } from '../../services/orderService';
+import { getAllOrders, updateOrderStatus, updatePaymentStatus, adminApproveOrder } from '../../services/orderService';
 import { getTransferProof } from '../../services/storageService';
 import { formatPrice } from '../../utils/formatPrice';
 import { formatDateTime } from '../../utils/formatDate';
@@ -35,18 +35,31 @@ export default function AdminOrdersPage() {
   };
 
   const handleStatusChange = async (orderId: string, status: OrderStatus) => {
-    await updateOrderStatus(orderId, status);
-    if (status === 'paid') {
-      await updatePaymentStatus(orderId, 'approved');
+    try {
+      if (status === 'paid') {
+        await adminApproveOrder(orderId);
+      } else {
+        await updateOrderStatus(orderId, status);
+      }
+      toast.success('Estado actualizado');
+      loadOrders();
+    } catch (err: any) {
+      toast.error(err?.message || 'Error al actualizar estado');
     }
-    toast.success('Estado actualizado');
-    loadOrders();
   };
 
   const handlePaymentChange = async (orderId: string, paymentStatus: PaymentStatus) => {
-    await updatePaymentStatus(orderId, paymentStatus);
-    toast.success('Estado de pago actualizado');
-    loadOrders();
+    try {
+      if (paymentStatus === 'approved') {
+        await adminApproveOrder(orderId);
+      } else {
+        await updatePaymentStatus(orderId, paymentStatus);
+      }
+      toast.success('Estado de pago actualizado');
+      loadOrders();
+    } catch (err: any) {
+      toast.error(err?.message || 'Error al actualizar estado de pago');
+    }
   };
 
   const filtered = filter === 'all' ? orders : orders.filter(o => o.status === filter);
@@ -82,14 +95,18 @@ export default function AdminOrdersPage() {
                 <td>
                   <select className="form-select" value={o.paymentStatus} onChange={e => handlePaymentChange(o.id, e.target.value as PaymentStatus)} style={{ padding: '4px 8px', fontSize: 'var(--text-xs)', minWidth: 100 }}>
                     <option value="pending">Pendiente</option>
-                    <option value="approved">Aprobado</option>
+                    <option value="approved" disabled={o.paymentMethod === 'mercadopago'}>
+                      {o.paymentMethod === 'mercadopago' ? 'Aprobado (validación MP)' : 'Aprobado'}
+                    </option>
                     <option value="rejected">Rechazado</option>
                   </select>
                 </td>
                 <td>
                   <select className="form-select" value={o.status} onChange={e => handleStatusChange(o.id, e.target.value as OrderStatus)} style={{ padding: '4px 8px', fontSize: 'var(--text-xs)', minWidth: 100 }}>
                     {Object.entries(ORDER_STATUS_LABELS).map(([k, v]) => (
-                      <option key={k} value={k}>{v}</option>
+                      <option key={k} value={k} disabled={k === 'paid' && o.paymentMethod === 'mercadopago'}>
+                        {k === 'paid' && o.paymentMethod === 'mercadopago' ? 'Pagada (validación MP)' : v}
+                      </option>
                     ))}
                   </select>
                 </td>

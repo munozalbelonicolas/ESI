@@ -7,6 +7,8 @@ import type { Product } from '../../types/product';
 import { FiShoppingBag, FiDownload } from 'react-icons/fi';
 import './ProductCard.css';
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+
 interface Props {
   product: Product;
   priority?: boolean;
@@ -29,8 +31,8 @@ export default function ProductCard({ product, priority = false }: Props) {
   const handleDownloadFree = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (product.digitalFileUrl) {
-      window.open(product.digitalFileUrl, '_blank', 'noopener,noreferrer');
+    if (product.hasDigitalDownload) {
+      window.open(`${API_BASE}/api/get-free-product-download?productId=${encodeURIComponent(product.id)}`, '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -81,7 +83,7 @@ export default function ProductCard({ product, priority = false }: Props) {
             {product.transferDiscountPercent}% OFF con Transferencia
           </div>
         )}
-        {product.isFree && product.digitalFileUrl ? (
+        {product.isFree && product.hasDigitalDownload ? (
           <button
             type="button"
             className="product-card__btn btn btn--primary btn--sm btn--full"

@@ -40,7 +40,7 @@ export async function validateCoupon(
   if (coupon.expiresAt && coupon.expiresAt.toMillis() < Date.now()) return null;
 
   // Verificar usos máximos
-  if (coupon.maxUses > 0 && coupon.usedCount >= coupon.maxUses) return null;
+  if (coupon.maxUses > 0 && coupon.usedCount + Number((coupon as any).reservedCount || 0) >= coupon.maxUses) return null;
 
   // Verificar compra mínima
   if (purchaseTotal < coupon.minPurchase) return null;
@@ -56,20 +56,6 @@ export function calculateDiscount(coupon: Coupon, subtotal: number): number {
     return Math.round((subtotal * coupon.value) / 100);
   }
   return Math.min(coupon.value, subtotal);
-}
-
-/**
- * Incrementa el contador de usos de un cupón.
- */
-export async function incrementCouponUsage(couponId: string): Promise<void> {
-  const ref = doc(db, COLLECTION, couponId);
-  const snap = await getDocs(
-    query(collection(db, COLLECTION), where('__name__', '==', couponId))
-  );
-  if (!snap.empty) {
-    const current = snap.docs[0].data().usedCount || 0;
-    await updateDoc(ref, { usedCount: current + 1 });
-  }
 }
 
 /**
@@ -89,6 +75,7 @@ export async function createCoupon(data: CouponFormData): Promise<string> {
     ...data,
     code: data.code.toUpperCase(),
     usedCount: 0,
+    reservedCount: 0,
     expiresAt: data.expiresAt ? Timestamp.fromDate(new Date(data.expiresAt)) : null,
     createdAt: Timestamp.now(),
   });

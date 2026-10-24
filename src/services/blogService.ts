@@ -92,7 +92,12 @@ export async function getPostBySlug(slug: string): Promise<BlogPost | null> {
     if (cached) return cached;
   }
   try {
-    const q = query(collection(db, COLLECTION), where('slug', '==', slug), limit(1));
+    const q = query(
+      collection(db, COLLECTION),
+      where('slug', '==', slug),
+      where('isPublished', '==', true),
+      limit(1)
+    );
     const snap = await getDocs(q);
     if (!snap.empty) {
       const d = snap.docs[0];

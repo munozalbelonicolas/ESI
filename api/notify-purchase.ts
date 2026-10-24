@@ -7,6 +7,25 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { getAdminDb, getVerifiedUserEmail, requireUser } from './_admin.ts';
+
+const esc = (v: unknown): string =>
+  String(v ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+/** Solo se permiten enlaces https; cualquier otra cosa se descarta. */
+const safeUrl = (v: unknown): string => {
+  try {
+    const u = new URL(String(v ?? ''));
+    return u.protocol === 'https:' ? u.toString() : '';
+  } catch {
+    return '';
+  }
+};
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@esi-secundaria.com.ar';
@@ -14,22 +33,23 @@ const ADMIN_EMAIL = process.env.ADMIN_EMAIL || '';
 const SITE_URL = (process.env.VITE_SITE_URL || 'https://esi-secundaria.com.ar').replace(/\/$/, '');
 
 export interface OrderEmailItem {
+  productId?: string;
   name?: string;
   title?: string;
   quantity?: number;
   price?: number;
   unit_price?: number;
   isDigital?: boolean;
-  downloadUrl?: string | null;
 }
 
 export interface OrderEmailData {
   orderId: string;
-  userEmail: string;
+  userId: string;
   userName?: string;
   items: OrderEmailItem[];
   total: number;
   paymentMethod?: string;
+  paymentStatus?: 'pending' | 'approved' | 'rejected';
   shippingAddress?: {
     street?: string;
     city?: string;
@@ -41,25 +61,77 @@ export interface OrderEmailData {
 
 export async function sendOrderConfirmationEmail(order: OrderEmailData) {
   if (!RESEND_API_KEY) {
-    console.warn('[Email] RESEND_API_KEY no configurado en Vercel, salteando envío de emails');
-    return { skipped: 'no RESEND_API_KEY' };
+    // Throw so callers keep emailSent=false and a later retry can succeed
+    // once the provider credentials are configured.
+    throw new Error('RESEND_API_KEY no configurado en Vercel');
   }
 
-  if (!order || !order.userEmail) {
+  if (!order || !order.userId) {
     throw new Error('Datos de orden o email de comprador no especificados');
   }
 
-  const { orderId, userEmail, userName = '', items = [], total, paymentMethod = 'mercadopago', shippingAddress, shippingMethod } = order;
+  const verifiedEmail = await getVerifiedUserEmail(order.userId);
+  if (!verifiedEmail) throw new Error('La cuenta compradora no tiene un email verificado');
 
-  // 1. Tabla de items compartida
-  const itemsHtml = items
+  const { orderId: rawOrderId, userName: rawUserName = '', items = [], total, paymentMethod = 'mercadopago', shippingAddress: rawShipping, shippingMethod: rawShippingMethod } = order;
+
+  // Valores crudos (asunto/destinatario) y versiones escapadas para el HTML
+  const userEmail = verifiedEmail;
+  const orderId = esc(rawOrderId);
+  const userName = esc(rawUserName);
+  const shippingMethod = esc(rawShippingMethod);
+  const shippingAddress = rawShipping
+    ? {
+        street: esc(rawShipping.street),
+        city: esc(rawShipping.city),
+        province: esc(rawShipping.province),
+        zipCode: esc(rawShipping.zipCode),
+      }
+    : null;
+  const emailForHtml = esc(userEmail);
+
+  const isApproved = order.paymentStatus === 'approved';
+  const db = getAdminDb();
+
+  // 1. Tabla de items compartida con resolución segura de archivos digitales
+  const itemsWithUrls = await Promise.all(
+    items.map(async (item) => {
+      let dl = '';
+      let canonicalDigital = false;
+      let canonicalName = item.name || item.title || 'Producto';
+      let canonicalPrice = Number(item.price || item.unit_price || 0);
+      if (item.productId) {
+        try {
+          const productSnap = await db.collection('products').doc(item.productId).get();
+          const product = productSnap.data();
+          canonicalDigital = !!productSnap.exists && product?.isDigital === true;
+          if (product) {
+            canonicalName = String(product.name || canonicalName);
+            canonicalPrice = Number(product.price || canonicalPrice);
+          }
+          if (isApproved && canonicalDigital) {
+            const privateSnap = await db.collection('productDownloads').doc(item.productId).get();
+            if (privateSnap.exists && privateSnap.data()?.downloadUrl) {
+              dl = safeUrl(privateSnap.data()?.downloadUrl);
+            }
+          }
+        } catch (err) {
+          console.warn(`[Email] Error resolviendo producto ${item.productId}:`, err);
+        }
+      }
+      return { ...item, name: canonicalName, price: canonicalPrice, isDigital: canonicalDigital, resolvedDownloadUrl: dl };
+    })
+  );
+
+  const itemsHtml = itemsWithUrls
     .map((item) => {
-      const name = item.name || item.title || 'Producto';
-      const qty = item.quantity || 1;
+      const name = esc(item.name || item.title || 'Producto');
+      const qty = Number(item.quantity) || 1;
       const price = Number(item.price || item.unit_price || 0);
+      const dl = item.resolvedDownloadUrl;
       const downloadLink =
-        item.isDigital && item.downloadUrl
-          ? `<br><a href="${item.downloadUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin-top: 4px; color: #6B2D7B; font-weight: bold; text-decoration: underline; font-size: 0.9em;">📥 Descargar material digital</a>`
+        isApproved && dl
+          ? `<br><a href="${esc(dl)}" target="_blank" rel="noopener noreferrer" style="display: inline-block; margin-top: 4px; color: #6B2D7B; font-weight: bold; text-decoration: underline; font-size: 0.9em;">📥 Descargar material digital</a>`
           : '';
 
       return `
@@ -82,6 +154,11 @@ export async function sendOrderConfirmationEmail(order: OrderEmailData) {
       </div>`
     : '';
 
+  // Mensaje personalizado según si el pago ya está acreditado o está pendiente de validación
+  const customerIntroText = isApproved
+    ? `Tu orden <strong>#${orderId}</strong> fue registrada y el pago fue <strong>acreditado correctamente</strong>. A continuación encontrás el detalle y los enlaces de descarga de tus materiales digitales.`
+    : `Tu orden <strong>#${orderId}</strong> fue registrada y tu comprobante de pago está en proceso de verificación por nuestro equipo. <em>Una vez confirmada la acreditación bancaria te enviaremos un nuevo correo con los enlaces de descarga de tus materiales digitales y podrás acceder a ellos desde tu cuenta en Mis Pedidos.</em>`;
+
   // 2. Email para el CLIENTE
   const customerHtml = `
     <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #FFFDF5; border: 1px solid #EAD895; border-radius: 12px; overflow: hidden;">
@@ -89,8 +166,8 @@ export async function sendOrderConfirmationEmail(order: OrderEmailData) {
         <h1 style="color: #FFE164; margin: 0; font-size: 24px; letter-spacing: 0.5px;">ESI en Secundaria</h1>
       </div>
       <div style="padding: 24px 28px;">
-        <h2 style="color: #6B2D7B; margin-top: 0;">¡Gracias por tu compra${userName ? ', ' + userName : ''}!</h2>
-        <p style="color: #333; line-height: 1.5;">Tu orden <strong>#${orderId}</strong> fue registrada y procesada correctamente.</p>
+        <h2 style="color: #6B2D7B; margin-top: 0;">${isApproved ? '¡Gracias por tu compra' : '¡Pedido recibido'}${userName ? ', ' + userName : ''}!</h2>
+        <p style="color: #333; line-height: 1.5;">${customerIntroText}</p>
 
         <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
           <thead>
@@ -139,7 +216,7 @@ export async function sendOrderConfirmationEmail(order: OrderEmailData) {
         <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
           <h3 style="margin-top: 0; color: #0F172A; font-size: 16px;">Datos del Comprador</h3>
           <p style="margin: 4px 0; color: #334155;"><strong>Nombre:</strong> ${userName || 'No informado'}</p>
-          <p style="margin: 4px 0; color: #334155;"><strong>Email:</strong> <a href="mailto:${userEmail}">${userEmail}</a></p>
+          <p style="margin: 4px 0; color: #334155;"><strong>Email:</strong> <a href="mailto:${emailForHtml}">${emailForHtml}</a></p>
           <p style="margin: 4px 0; color: #334155;"><strong>Medio de pago:</strong> ${paymentMethod === 'mercadopago' ? 'Mercado Pago (Aprobado)' : 'Transferencia Bancaria'}</p>
           <p style="margin: 4px 0; color: #334155;"><strong>Monto Total:</strong> <span style="color: #059669; font-weight: bold; font-size: 1.1em;">$${Number(total || 0).toLocaleString('es-AR')}</span></p>
         </div>
@@ -178,7 +255,7 @@ export async function sendOrderConfirmationEmail(order: OrderEmailData) {
       body: JSON.stringify({
         from: `ESI en Secundaria <${FROM_EMAIL}>`,
         to: [userEmail],
-        subject: `Confirmación de compra #${orderId} — ESI en Secundaria`,
+        subject: `Confirmación de compra #${rawOrderId} — ESI en Secundaria`,
         html: customerHtml,
       }),
     });
@@ -207,7 +284,7 @@ export async function sendOrderConfirmationEmail(order: OrderEmailData) {
         body: JSON.stringify({
           from: `ESI en Secundaria <${FROM_EMAIL}>`,
           to: [ADMIN_EMAIL],
-          subject: `🛍️ ¡Nueva venta #${orderId}! - $${Number(total || 0).toLocaleString('es-AR')} (${userName || userEmail})`,
+          subject: `🛍️ ¡Nueva venta #${rawOrderId}! - $${Number(total || 0).toLocaleString('es-AR')} (${String(rawUserName || userEmail).replace(/[\r\n]/g, ' ')})`,
           html: adminHtml,
         }),
       });
@@ -227,24 +304,138 @@ export async function sendOrderConfirmationEmail(order: OrderEmailData) {
     console.warn('[Email] ADMIN_EMAIL no configurado; no se envió aviso al administrador');
   }
 
+  // Do not let callers mark the order as emailed when Resend rejected (or
+  // failed) the customer's message. The order can then be retried later.
+  if (!results.customerEmailId) {
+    throw new Error('No se pudo enviar el correo de confirmación al cliente');
+  }
+
   return results;
 }
 
+/**
+ * Endpoint: el cliente autenticado pide el email de su propia orden (por orderId).
+ * El contenido se arma SIEMPRE desde Firestore; nunca desde el cuerpo de la petición.
+ * Solo se envía una vez por orden (flag emailSent). Las órdenes de Mercado Pago
+ * requieren pago aprobado (ese caso lo dispara el webhook/verificación).
+ */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const { order } = req.body || {};
-    if (!order || !order.userEmail) {
-      return res.status(400).json({ error: 'Datos de orden requeridos' });
+    const user = await requireUser(req);
+    if (!user) return res.status(401).json({ error: 'No autenticado' });
+
+    const orderId = req.body?.orderId ?? req.body?.order?.orderId;
+    if (!orderId || typeof orderId !== 'string') {
+      return res.status(400).json({ error: 'orderId requerido' });
     }
 
-    const result = await sendOrderConfirmationEmail(order);
-    return res.status(200).json({ sent: true, ...result });
+    const orderRef = getAdminDb().collection('orders').doc(orderId);
+    const snap = await orderRef.get();
+    if (!snap.exists) return res.status(404).json({ error: 'Orden no encontrada' });
+
+    const o = snap.data() || {};
+    if (o.userId !== user.uid && !user.isAdmin) return res.status(403).json({ error: 'No autorizado' });
+    if (o.userId !== user.uid) {
+      if (!user.isAdmin) return res.status(403).json({ error: 'No autorizado' });
+    } else if (!user.emailVerified || !user.email) {
+      return res.status(403).json({ error: 'Verificá el email de tu cuenta antes de recibir notificaciones' });
+    }
+
+    // CASO 1: Pago ya aprobado (Mercado Pago o Transferencia confirmada por Admin)
+    if (o.paymentStatus === 'approved') {
+      const claimed = await getAdminDb().runTransaction(async (transaction) => {
+        const freshOrder = await transaction.get(orderRef);
+        if (!freshOrder.exists) throw new Error('ORDER_NOT_FOUND');
+        const fresh = freshOrder.data() || {};
+        if (fresh.userId !== user.uid && !user.isAdmin) throw new Error('NOT_OWNER');
+        if (fresh.paymentStatus !== 'approved') throw new Error('NOT_APPROVED');
+        if (fresh.emailSent) return false;
+        transaction.update(orderRef, { emailSent: true, updatedAt: new Date() });
+        return true;
+      });
+      if (!claimed) return res.status(200).json({ sent: false, reason: 'already_sent' });
+      try {
+        await sendOrderConfirmationEmail({
+          orderId,
+          userId: o.userId,
+          userName: o.userName,
+          items: o.items || [],
+          total: o.total || 0,
+          paymentMethod: o.paymentMethod,
+          paymentStatus: 'approved',
+          shippingAddress: o.shippingAddress || null,
+          shippingMethod: o.shippingMethod || '',
+        });
+      } catch (e) {
+        await orderRef.update({ emailSent: false });
+        throw e;
+      }
+      return res.status(200).json({ sent: true, type: 'approved_confirmation' });
+    }
+
+    // CASO 2: Pago pendiente por Transferencia (envía acuse de recibo pero NUNCA enlaces de descarga)
+    if (o.paymentMethod === 'transfer' && o.paymentStatus === 'pending') {
+      const db = getAdminDb();
+      const limitRef = db.collection('emailDispatchLimits').doc(o.userId);
+      let claimed = false;
+      await db.runTransaction(async (transaction) => {
+        claimed = false;
+        const freshOrder = await transaction.get(orderRef);
+        const limitSnap = await transaction.get(limitRef);
+        if (!freshOrder.exists) throw new Error('ORDER_NOT_FOUND');
+        const fresh = freshOrder.data() || {};
+        if (fresh.userId !== user.uid && !user.isAdmin) throw new Error('NOT_OWNER');
+        if (fresh.paymentMethod !== 'transfer' || fresh.paymentStatus !== 'pending') throw new Error('NOT_PENDING_TRANSFER');
+        if (fresh.pendingNoticeSent) return;
+
+        const now = Date.now();
+        const current = limitSnap.data() || {};
+        const windowStart = Number(current.windowStart || 0);
+        const count = now - windowStart < 60 * 60 * 1000 ? Number(current.count || 0) : 0;
+        if (count >= 3) throw new Error('EMAIL_RATE_LIMIT');
+
+        transaction.update(orderRef, { pendingNoticeSent: true, updatedAt: new Date() });
+        transaction.set(limitRef, {
+          windowStart: count ? windowStart : now,
+          count: count + 1,
+          updatedAt: new Date(),
+        });
+        claimed = true;
+      });
+      if (!claimed) return res.status(200).json({ sent: false, reason: 'already_sent' });
+
+      try {
+        await sendOrderConfirmationEmail({
+          orderId,
+          userId: o.userId,
+          userName: o.userName,
+          items: o.items || [],
+          total: o.total || 0,
+          paymentMethod: 'transfer',
+          paymentStatus: 'pending',
+          shippingAddress: o.shippingAddress || null,
+          shippingMethod: o.shippingMethod || '',
+        });
+      } catch (e) {
+        await orderRef.update({ pendingNoticeSent: false });
+        throw e;
+      }
+      return res.status(200).json({ sent: true, type: 'transfer_pending_notice' });
+    }
+
+    // CASO 3: Cualquier otro método sin pago aprobado
+    return res.status(409).json({ error: 'El pago aún no está acreditado' });
   } catch (error: any) {
     console.error('[Email] Error en handler:', error.message || error);
-    return res.status(500).json({ error: 'Error al procesar email', detail: error.message });
+    if (error?.message === 'EMAIL_RATE_LIMIT') return res.status(429).json({ error: 'Demasiados avisos; intentá nuevamente más tarde' });
+    if (error?.message === 'NOT_OWNER') return res.status(403).json({ error: 'No autorizado' });
+    if (error?.message === 'ORDER_NOT_FOUND') return res.status(404).json({ error: 'Orden no encontrada' });
+    if (error?.message === 'NOT_APPROVED') return res.status(409).json({ error: 'El pago aún no está acreditado' });
+    if (error?.message === 'NOT_PENDING_TRANSFER') return res.status(409).json({ error: 'La transferencia no está pendiente' });
+    return res.status(500).json({ error: 'Error al procesar email' });
   }
 }

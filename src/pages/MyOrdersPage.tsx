@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuthContext } from '../context/AuthContext';
 import { getUserOrders, deleteOrder } from '../services/orderService';
-import { createMPPreference, verifyOrderPayment } from '../services/paymentService';
+import { createMPPreference, verifyOrderPayment, getDigitalDownloadUrl } from '../services/paymentService';
 import { formatPrice } from '../utils/formatPrice';
 import { formatDateShort } from '../utils/formatDate';
 import { ORDER_STATUS_LABELS, PAYMENT_STATUS_LABELS } from '../types/order';
@@ -17,6 +17,7 @@ export default function MyOrdersPage() {
   const [payingId, setPayingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
+  const [downloadingItem, setDownloadingItem] = useState<string | null>(null);
 
   useEffect(() => {
     if (!firebaseUser) return;
@@ -60,16 +61,27 @@ export default function MyOrdersPage() {
     }
   };
 
+  const handleDownloadItem = async (orderId: string, productId: string, name: string) => {
+    const key = `${orderId}_${productId}`;
+    setDownloadingItem(key);
+    try {
+      const url = await getDigitalDownloadUrl(orderId, productId);
+      if (url) {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      } else {
+        toast.error('No se encontró el enlace de descarga');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error al obtener la descarga');
+    } finally {
+      setDownloadingItem(null);
+    }
+  };
+
   const handlePayOrder = async (order: Order) => {
     setPayingId(order.id);
     try {
-      const pref = await createMPPreference(
-        order.id,
-        order.items,
-        firebaseUser?.email || order.userEmail || '',
-        order.shippingCost || 0,
-        order.discount || 0
-      );
+      const pref = await createMPPreference(order.id);
       const redirectUrl = pref.initPoint || pref.sandboxInitPoint;
       if (redirectUrl) {
         toast.success('Redirigiendo a Mercado Pago...');
@@ -91,18 +103,19 @@ export default function MyOrdersPage() {
     try {
       await deleteOrder(orderId);
     } catch (err: any) {
-      console.warn('[MyOrdersPage] No se pudo borrar en Firestore, ocultando localmente:', err);
-    } finally {
-      // Guardar ID en localStorage para ocultarla siempre
-      const hidden: string[] = JSON.parse(localStorage.getItem('esi_hidden_orders') || '[]');
-      if (!hidden.includes(orderId)) {
-        hidden.push(orderId);
-        localStorage.setItem('esi_hidden_orders', JSON.stringify(hidden));
-      }
-      setOrders((prev) => prev.filter((o) => o.id !== orderId));
-      toast.success('Compra eliminada correctamente');
+      console.warn('[MyOrdersPage] No se pudo cancelar el pedido:', err);
+      toast.error(err?.message || 'No se pudo cancelar el pedido');
       setDeletingId(null);
+      return;
     }
+    const hidden: string[] = JSON.parse(localStorage.getItem('esi_hidden_orders') || '[]');
+    if (!hidden.includes(orderId)) {
+      hidden.push(orderId);
+      localStorage.setItem('esi_hidden_orders', JSON.stringify(hidden));
+    }
+    setOrders((prev) => prev.filter((o) => o.id !== orderId));
+    toast.success('Pedido cancelado correctamente');
+    setDeletingId(null);
   };
 
   if (loading) return <div className="page-loader"><div className="spinner" /></div>;
@@ -176,7 +189,8 @@ export default function MyOrdersPage() {
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
                     {o.items.map((item, i) => {
                       const isPaid = o.paymentStatus === 'approved' || o.status === 'paid';
-                      const showDownload = item.isDigital && item.downloadUrl && isPaid;
+                      const showDownload = item.isDigital && isPaid;
+                      const isBusy = downloadingItem === `${o.id}_${item.productId}`;
                       return (
                         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <span
@@ -191,16 +205,16 @@ export default function MyOrdersPage() {
                             {item.name} x{item.quantity}
                           </span>
                           {showDownload && (
-                            <a
-                              href={item.downloadUrl!}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadItem(o.id, item.productId, item.name)}
+                              disabled={isBusy}
                               className="btn btn--primary btn--sm"
                               style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', fontSize: 'var(--text-xs)' }}
                               title={`Descargar ${item.name}`}
                             >
-                              <FiDownload size={13} /> Descargar
-                            </a>
+                              <FiDownload size={13} /> {isBusy ? 'Cargando...' : 'Descargar'}
+                            </button>
                           )}
                         </div>
                       );

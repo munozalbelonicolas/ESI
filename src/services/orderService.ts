@@ -3,16 +3,16 @@ import {
   doc,
   getDocs,
   getDoc,
-  addDoc,
   updateDoc,
-  deleteDoc,
   query,
   where,
   orderBy,
   Timestamp,
 } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { auth, db } from '../config/firebase';
 import type { Order, OrderItem, ShippingAddress, PaymentMethod } from '../types/order';
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 
 const COLLECTION = 'orders';
 
@@ -30,21 +30,20 @@ export interface CreateOrderData {
   total: number;
   paymentMethod: PaymentMethod;
 }
-
 /**
  * Crea una nueva orden.
  */
 export async function createOrder(data: CreateOrderData): Promise<string> {
-  const ref = await addDoc(collection(db, COLLECTION), {
-    ...data,
-    paymentStatus: 'pending',
-    mpPaymentId: null,
-    transferProofUrl: null,
-    status: 'pending',
-    createdAt: Timestamp.now(),
-    updatedAt: Timestamp.now(),
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('Iniciá sesión para continuar');
+  const response = await fetch(`${API_BASE}/api/create-order`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(data),
   });
-  return ref.id;
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || 'No se pudo crear el pedido');
+  return result.orderId;
 }
 
 /**
@@ -167,14 +166,36 @@ export async function saveTransferProof(
  * Elimina una orden por ID (con fallback a cancelación si faltan permisos de borrado en Firestore).
  */
 export async function deleteOrder(orderId: string): Promise<void> {
-  try {
-    await deleteDoc(doc(db, COLLECTION, orderId));
-  } catch (err: any) {
-    console.warn('[orderService] deleteDoc falló por permisos, cancelando la orden:', err?.message || err);
-    await updateDoc(doc(db, COLLECTION, orderId), {
-      status: 'cancelled',
-      paymentStatus: 'rejected',
-      updatedAt: Timestamp.now(),
-    });
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('No autenticado');
+  const response = await fetch(`${API_BASE}/api/cancel-order`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ orderId }),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || 'No se pudo cancelar el pedido');
+}
+
+/**
+ * Aprueba una orden desde el backend como Administrador de forma segura
+ * (actualiza estado, descuenta stock atómicamente y despacha email con descargas).
+ */
+export async function adminApproveOrder(orderId: string): Promise<void> {
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('No autenticado');
+
+  const res = await fetch(`${API_BASE}/api/admin-approve-order`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ orderId }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Error al aprobar la orden');
   }
 }

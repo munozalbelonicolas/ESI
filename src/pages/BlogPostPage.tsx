@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getPostBySlug } from '../services/blogService';
+import { sanitizeHtml } from '../utils/sanitizeHtml';
 import { formatDate } from '../utils/formatDate';
 import type { BlogPost } from '../types/blog';
 import { FiArrowLeft, FiCalendar } from 'react-icons/fi';
@@ -87,7 +88,7 @@ export default function BlogPostPage() {
             ))}
           </div>
         )}
-        <div className="rich-text" dangerouslySetInnerHTML={{ __html: post.body }} />
+        <div className="rich-text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(post.body) }} />
 
         {/* ── Links internos — mejora SEO ── */}
         <nav aria-label="Navegación relacionada" style={{ marginTop: 48, padding: '24px', background: 'var(--color-bg-alt)', borderRadius: 12, borderTop: '3px solid var(--color-secondary)' }}>

@@ -13,7 +13,8 @@ export interface Product {
   images: string[];
   stock: number; // -1 = digital/ilimitado
   isDigital: boolean;
-  digitalFileUrl: string | null;
+  hasDigitalDownload?: boolean;
+  publicCatalogReady?: boolean;
   weightGrams?: number;
   customShippingPrice?: number | null;
   transferDiscountPercent?: number | null;
@@ -34,7 +35,7 @@ export interface ProductFormData {
   images: string[];
   stock: number;
   isDigital: boolean;
-  digitalFileUrl: string | null;
+  digitalFileUrl?: string | null;
   weightGrams?: number;
   customShippingPrice?: number | null;
   transferDiscountPercent?: number | null;

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getAllProducts, createProduct, updateProduct, deleteProduct } from '../../services/productService';
+import { getAllProducts, createProduct, updateProduct, deleteProduct, getPrivateProductDownload, migrateLegacyProductDownloads } from '../../services/productService';
 import { uploadProductImage } from '../../services/storageService';
 import { formatPrice } from '../../utils/formatPrice';
 import type { Product, ProductFormData } from '../../types/product';
@@ -13,6 +13,18 @@ export default function AdminProductsPage() {
   const [uploadingImages, setUploadingImages] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [migrationPreview, setMigrationPreview] = useState<{
+    migrated: number;
+    cleaned: number;
+    skippedInvalid: number;
+    productsToMarkReady: number;
+    productsToKeepHidden: number;
+    linksToMigrate: { productId: string; productName: string; displayUrl: string }[];
+    invalidProducts: { productId: string; productName: string }[];
+    previewTruncated: boolean;
+    invalidProductsTruncated: boolean;
+  } | null>(null);
+  const [migratingDownloads, setMigratingDownloads] = useState(false);
   const [form, setForm] = useState<ProductFormData>({
     name: '', description: '', shortDescription: '', price: 0, compareAtPrice: null,
     isFree: false, category: PRODUCT_CATEGORIES[0], images: [], stock: -1,
@@ -28,6 +40,44 @@ export default function AdminProductsPage() {
 
   useEffect(() => { loadProducts(); }, []);
 
+  const handleMigrateDownloads = async () => {
+    if (migratingDownloads) return;
+    try {
+      setMigratingDownloads(true);
+      const preview = await migrateLegacyProductDownloads(true);
+      setMigrationPreview({
+        migrated: preview.migrated,
+        cleaned: preview.cleaned,
+        skippedInvalid: preview.skippedInvalid,
+        productsToMarkReady: preview.productsToMarkReady,
+        productsToKeepHidden: preview.productsToKeepHidden,
+        linksToMigrate: preview.linksToMigrate || [],
+        invalidProducts: preview.invalidProducts || [],
+        previewTruncated: preview.previewTruncated === true,
+        invalidProductsTruncated: preview.invalidProductsTruncated === true,
+      });
+    } catch (err: any) {
+      toast.error(err.message || 'No se pudo revisar los enlaces');
+    } finally {
+      setMigratingDownloads(false);
+    }
+  };
+
+  const confirmMigration = async () => {
+    if (migratingDownloads) return;
+    try {
+      setMigratingDownloads(true);
+      const result = await migrateLegacyProductDownloads();
+      setMigrationPreview(null);
+      toast.success(`Migración terminada: ${result.migrated} enlaces movidos, ${result.cleaned} registros limpiados${result.skippedInvalid ? `, ${result.skippedInvalid} enlaces inválidos para revisar` : ''}`);
+      await loadProducts();
+    } catch (err: any) {
+      toast.error(err.message || 'No se pudo migrar los enlaces');
+    } finally {
+      setMigratingDownloads(false);
+    }
+  };
+
   const resetForm = () => {
     setForm({
       name: '', description: '', shortDescription: '', price: 0, compareAtPrice: null,
@@ -39,11 +89,18 @@ export default function AdminProductsPage() {
     setShowForm(false);
   };
 
-  const handleEdit = (p: Product) => {
+  const handleEdit = async (p: Product) => {
+    let digitalFileUrl: string;
+    try {
+      digitalFileUrl = await getPrivateProductDownload(p.id);
+    } catch (err: any) {
+      toast.error(err.message || 'No se pudo cargar el enlace privado');
+      return;
+    }
     setForm({
       name: p.name, description: p.description, shortDescription: p.shortDescription,
       price: p.price, compareAtPrice: p.compareAtPrice, isFree: p.isFree, category: p.category,
-      images: p.images, stock: p.stock, isDigital: p.isDigital, digitalFileUrl: p.digitalFileUrl,
+      images: p.images, stock: p.stock, isDigital: p.isDigital, digitalFileUrl: digitalFileUrl || null,
       weightGrams: p.weightGrams ?? 500, customShippingPrice: p.customShippingPrice ?? null,
       transferDiscountPercent: p.transferDiscountPercent ?? null,
       isActive: p.isActive, tags: p.tags
@@ -121,9 +178,14 @@ export default function AdminProductsPage() {
     <div>
       <div className="admin-header">
         <h1>Productos ({products.length})</h1>
-        <button className="btn btn--primary" onClick={() => { resetForm(); setShowForm(true); }}>
-          <FiPlus /> Nuevo producto
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn--ghost" onClick={handleMigrateDownloads} disabled={migratingDownloads}>
+            {migratingDownloads ? 'Revisando…' : 'Revisar enlaces existentes'}
+          </button>
+          <button className="btn btn--primary" onClick={() => { resetForm(); setShowForm(true); }}>
+            <FiPlus /> Nuevo producto
+          </button>
+        </div>
       </div>
 
       {showForm && (
@@ -240,8 +302,8 @@ export default function AdminProductsPage() {
                 />
                 <span style={{ fontSize: 'var(--text-xs)', color: '#166534', marginTop: 4, display: 'block' }}>
                   {form.isFree
-                    ? '📢 Este link será visible de inmediato en la página del producto (es gratuito).'
-                    : '🔒 Este link solo será visible al comprador cuando el pago sea aprobado.'}
+                    ? '📢 El archivo se guardará de forma privada y se entregará desde la página del producto gratuito.'
+                    : '🔒 El archivo se guardará de forma privada y solo se entregará tras aprobarse el pago.'}
                 </span>
               </div>
             )}
@@ -288,6 +350,45 @@ export default function AdminProductsPage() {
               <button type="button" className="btn btn--ghost" onClick={resetForm}>Cancelar</button>
             </div>
           </form>
+        </div>
+      )}
+
+      {migrationPreview && (
+        <div role="presentation" onClick={() => !migratingDownloads && setMigrationPreview(null)} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,.55)', display: 'grid', placeItems: 'center', padding: 16 }}>
+          <section role="dialog" aria-modal="true" aria-labelledby="migration-preview-title" onClick={e => e.stopPropagation()} className="admin-form" style={{ width: 'min(760px, 100%)', maxHeight: '85vh', overflow: 'auto' }}>
+            <h2 id="migration-preview-title">Revisión de enlaces existentes</h2>
+            <p>Esto todavía no hizo cambios. Se encontraron {migrationPreview.migrated} enlace(s) para guardar de forma privada, {migrationPreview.cleaned} producto(s) para limpiar y {migrationPreview.productsToMarkReady} producto(s) para habilitar en la tienda.</p>
+            <p>Los enlaces de Drive se conservan. Los productos gratuitos seguirán ofreciendo su descarga y los pagos se entregarán después de aprobarse la compra.</p>
+            <p>Los parámetros privados de las direcciones se ocultan en esta lista.</p>
+            {migrationPreview.linksToMigrate.length > 0 ? (
+              <ul style={{ maxHeight: 320, overflow: 'auto', paddingLeft: 24 }}>
+                {migrationPreview.linksToMigrate.map(link => (
+                  <li key={link.productId} style={{ marginBottom: 12 }}>
+                    <strong>{link.productName}</strong><br />
+                    <code style={{ overflowWrap: 'anywhere' }}>{link.displayUrl}</code>
+                  </li>
+                ))}
+              </ul>
+            ) : <p>No se encontraron enlaces HTTPS válidos para mover.</p>}
+            {migrationPreview.previewTruncated && <p>Se muestran los primeros 100 enlaces; el total detectado es {migrationPreview.migrated}.</p>}
+            {migrationPreview.skippedInvalid > 0 && (
+              <div role="alert">
+                <p>{migrationPreview.skippedInvalid} enlace(s) inválido(s) no se moverán. Esos productos permanecerán ocultos hasta que se revise el dato.</p>
+                <ul style={{ maxHeight: 180, overflow: 'auto', paddingLeft: 24 }}>
+                  {migrationPreview.invalidProducts.map(product => (
+                    <li key={product.productId}>{product.productName} ({product.productId})</li>
+                  ))}
+                </ul>
+                {migrationPreview.invalidProductsTruncated && <p>Se muestran los primeros 100 productos con enlaces inválidos.</p>}
+              </div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
+              <button className="btn btn--ghost" onClick={() => setMigrationPreview(null)} disabled={migratingDownloads}>Cancelar</button>
+              <button className="btn btn--primary" onClick={confirmMigration} disabled={migratingDownloads || (migrationPreview.migrated === 0 && migrationPreview.cleaned === 0 && migrationPreview.productsToMarkReady === 0 && migrationPreview.skippedInvalid === 0)}>
+                {migratingDownloads ? 'Procesando…' : 'Confirmar migración'}
+              </button>
+            </div>
+          </section>
         </div>
       )}
 

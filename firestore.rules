@@ -18,58 +18,102 @@ service cloud.firestore {
     // ── Users ──
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      allow create: if isAuth() && request.auth.uid == userId;
-      allow update: if isOwner(userId) || isAdmin();
+      // Un usuario solo puede crear su perfil como 'customer' (el rol admin se asigna desde la consola/Admin SDK)
+      allow create: if isAuth() && request.auth.uid == userId
+        && request.resource.data.role == 'customer';
+      // El titular puede editar su perfil pero NUNCA su rol; el admin puede todo
+      allow update: if isAdmin()
+        || (isOwner(userId) && request.resource.data.role == resource.data.role);
       allow delete: if isAdmin();
     }
 
     // ── Products ──
     match /products/{productId} {
-      // Lectura pública de productos activos
-      allow read: if true;
+      // Solo se exponen productos que la migración marcó como seguros para
+      // catálogo. Las consultas públicas deben incluir esta misma condición.
+      allow read: if isAdmin() || (
+        resource.data.isActive == true
+        && resource.data.publicCatalogReady == true
+      );
       // Solo admins pueden escribir
       allow create, update, delete: if isAdmin();
     }
 
     // ── Blog Posts ──
     match /blogPosts/{postId} {
-      // Lectura pública de posts publicados
-      allow read: if true;
+      // Los visitantes solo pueden leer posts publicados; los admins también ven borradores.
+      allow read: if isAdmin() || resource.data.isPublished == true;
       // Solo admins pueden escribir
       allow create, update, delete: if isAdmin();
     }
 
     // ── Orders ──
+    // Los campos de pago/estado/total solo los modifican el servidor (Admin SDK) o un admin.
     match /orders/{orderId} {
       // El usuario dueño o un admin pueden leer
       allow read: if isAuth() && (resource.data.userId == request.auth.uid || isAdmin());
-      // Un usuario autenticado puede crear su propia orden
-      allow create: if isAuth() && request.resource.data.userId == request.auth.uid;
-      // El usuario dueño puede actualizar su orden (ej: agregar comprobante); admin puede cambiar estados
-      allow update: if isAuth() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow delete: if isAuth() && (resource.data.userId == request.auth.uid || isAdmin());
+      // Los pedidos se crean desde el servidor para reservar los cupones de forma atómica.
+      allow create: if false;
+      // El dueño solo puede adjuntar el comprobante; el admin puede cambiar estados
+      allow update: if isAdmin()
+        || (isAuth() && resource.data.userId == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['transferProofUrl', 'updatedAt']));
+      // El dueño solo puede borrar pedidos no pagados; el admin puede borrar cualquiera
+      allow delete: if isAdmin()
+        || (isAuth() && resource.data.userId == request.auth.uid
+            && resource.data.paymentStatus != 'approved'
+            && resource.data.status == 'pending');
     }
 
     // ── Transfer Proofs (comprobantes de pago por transferencia) ──
+    // Solo el titular de la orden o un admin pueden leer/escribir el comprobante.
     match /transferProofs/{orderId} {
-      // El usuario dueño o un admin pueden leer
-      allow read: if isAuth();
-      // Un usuario autenticado puede crear/actualizar su propio comprobante
-      allow create, update: if isAuth();
+      allow read: if isAuth() && (
+        isAdmin()
+        || (exists(/databases/$(database)/documents/orders/$(orderId))
+            && get(/databases/$(database)/documents/orders/$(orderId)).data.userId == request.auth.uid)
+      );
+      allow create, update: if isAuth()
+        && exists(/databases/$(database)/documents/orders/$(orderId))
+        && get(/databases/$(database)/documents/orders/$(orderId)).data.userId == request.auth.uid
+        && request.resource.data.orderId == orderId
+        && request.resource.data.imageData is string
+        && request.resource.data.imageData.matches('^data:image/(jpeg|png|webp);base64,.*')
+        && request.resource.data.imageData.size() < 900000;
       allow delete: if isAdmin();
     }
 
     // ── Coupons ──
     match /coupons/{couponId} {
-      // Lectura pública (necesaria para validación en el frontend)
-      allow read: if true;
+      // Los visitantes solo pueden consultar cupones activos; los admins gestionan todos.
+      allow read: if isAdmin() || resource.data.isActive == true;
       // Solo admins pueden escribir
-      allow create, update, delete: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin()
+        && (request.resource.data.maxUses == 0
+            || request.resource.data.maxUses >= resource.data.get('usedCount', 0) + resource.data.get('reservedCount', 0));
+      allow delete: if isAdmin() && resource.data.get('reservedCount', 0) == 0;
+    }
+
+    // ── Archivos digitales privados (solo Admin SDK / Admins) ──
+    match /productDownloads/{productId} {
+      allow read, write: if isAdmin();
+    }
+
+    // ── Registro idempotente de pagos de Mercado Pago (solo Servidor / Admin SDK) ──
+    match /mpPayments/{paymentId} {
+      allow read, write: if false;
+    }
+
+    // Reservas y contadores de cupones solo son modificables por el servidor.
+    match /couponReservations/{reservationId} {
+      allow read, write: if false;
     }
 
     // ── Settings (Datos bancarios, Envíos, Configuración de Mercado Pago) ──
     match /settings/{settingId} {
-      allow read: if true;
+      // 'mercadopago' y 'shipping' contienen credenciales y tokens privados: solo admin.
+      allow read: if (settingId != 'mercadopago' && settingId != 'shipping') || isAdmin();
       allow write: if isAdmin();
     }
   }

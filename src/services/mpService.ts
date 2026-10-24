@@ -17,7 +17,9 @@ export interface MPSettings {
 }
 
 export const DEFAULT_MP_SETTINGS: MPSettings = {
-  accessToken: import.meta.env.VITE_MP_ACCESS_TOKEN || '',
+  // El access token NUNCA debe venir de una variable VITE_* (se incluye en el bundle público).
+  // El servidor usa MP_ACCESS_TOKEN (variable de entorno de Vercel sin prefijo VITE_).
+  accessToken: '',
   publicKey: import.meta.env.VITE_MP_PUBLIC_KEY || '',
   isSandbox: true,
   maxInstallments: 12,

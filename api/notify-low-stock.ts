@@ -34,9 +34,27 @@ function getAdminDb() {
   return getFirestore();
 }
 
+const esc = (v: unknown): string =>
+  String(v ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST' && req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  // Autenticación del cron: Vercel envía "Authorization: Bearer $CRON_SECRET" si la variable existe.
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    console.error('[StockCheck] CRON_SECRET no configurado; endpoint deshabilitado');
+    return res.status(503).json({ error: 'No disponible' });
+  }
+  if (req.headers.authorization !== `Bearer ${cronSecret}`) {
+    return res.status(401).json({ error: 'No autorizado' });
   }
 
   try {
@@ -70,10 +88,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .map(
           (p) => `
         <tr>
-          <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: 600;">${p.name}</td>
-          <td style="padding: 8px; border-bottom: 1px solid #eee;">${p.category}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #eee; font-weight: 600;">${esc(p.name)}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #eee;">${esc(p.category)}</td>
           <td style="padding: 8px; border-bottom: 1px solid #eee; text-align: center;">
-            <span style="background: #FF9800; color: white; padding: 2px 8px; border-radius: 4px; font-weight: bold;">${p.stock} uds</span>
+            <span style="background: #FF9800; color: white; padding: 2px 8px; border-radius: 4px; font-weight: bold;">${esc(p.stock)} uds</span>
           </td>
         </tr>`
         )
@@ -117,10 +135,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(200).json({
       checked: true,
       lowStock: lowStockProducts.length,
-      products: lowStockProducts,
     });
   } catch (error: any) {
     console.error('[StockCheck] Error:', error.message || error);
-    res.status(500).json({ error: 'Error al verificar stock', detail: error.message });
+    res.status(500).json({ error: 'Error al verificar stock' });
   }
 }

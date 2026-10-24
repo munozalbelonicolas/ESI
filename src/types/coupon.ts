@@ -10,6 +10,7 @@ export interface Coupon {
   minPurchase: number;
   maxUses: number;
   usedCount: number;
+  reservedCount?: number;
   isActive: boolean;
   expiresAt: Timestamp | null;
   createdAt: Timestamp;

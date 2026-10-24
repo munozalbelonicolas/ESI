@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getProductBySlug } from '../services/productService';
+import { sanitizeHtml } from '../utils/sanitizeHtml';
 import { useCartContext } from '../context/CartContext';
 import { formatPrice, calcDiscount } from '../utils/formatPrice';
 import { getOptimizedImageUrl } from '../utils/imageUtils';
@@ -11,6 +12,8 @@ import { FiShoppingBag, FiArrowLeft, FiMinus, FiPlus, FiDownload, FiTruck, FiSea
 import toast from 'react-hot-toast';
 import { useSEO } from '../hooks/useSEO';
 import './ProductPage.css';
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 
 export default function ProductPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -186,9 +189,9 @@ export default function ProductPage() {
 
             <div className="product-page__actions">
               {/* Producto gratuito CON link: botón de descarga directa */}
-              {product.isFree && product.digitalFileUrl ? (
+              {product.isFree && product.hasDigitalDownload ? (
                 <a
-                  href={product.digitalFileUrl}
+                  href={`${API_BASE}/api/get-free-product-download?productId=${encodeURIComponent(product.id)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn btn--primary btn--lg btn--full"
@@ -264,7 +267,7 @@ export default function ProductPage() {
             {/* Description */}
             <div className="product-page__description">
               <h3>Descripción</h3>
-              <div className="rich-text" dangerouslySetInnerHTML={{ __html: product.description }} />
+              <div className="rich-text" dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description) }} />
             </div>
           </div>
         </div>

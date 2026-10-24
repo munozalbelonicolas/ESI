@@ -7,7 +7,6 @@ export interface OrderItem {
   quantity: number;
   isDigital: boolean;
   image: string;
-  downloadUrl?: string | null; // Link de Google Drive para recursos digitales
 }
 
 export interface ShippingAddress {

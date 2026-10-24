@@ -4,6 +4,10 @@
     {
       "path": "/api/notify-low-stock",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/release-expired-coupon-reservations",
+      "schedule": "30 9 * * *"
     }
   ],
   "functions": {
@@ -22,7 +26,16 @@
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin-allow-popups" }
+        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin-allow-popups" },
+        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(), payment=(self)" },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' https://www.googletagmanager.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebaseapp.com https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://api.correoargentino.com.ar; frame-src https://accounts.google.com https://*.firebaseapp.com https://apis.google.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+        }
       ]
     },
     {

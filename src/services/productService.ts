@@ -14,13 +14,65 @@ import {
   Timestamp,
   DocumentSnapshot,
 } from 'firebase/firestore';
-import { db } from '../config/firebase';
+import { auth, db } from '../config/firebase';
 import type { Product, ProductFormData } from '../types/product';
 import { slugify } from '../utils/validators';
 import { SAMPLE_PRODUCTS } from '../data/sampleData';
 
 const COLLECTION = 'products';
 const PAGE_SIZE = 12;
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+
+function publicProduct(id: string, data: Record<string, any>): Product {
+  const { digitalFileUrl, ...safeData } = data;
+  return {
+    ...safeData,
+    id,
+    hasDigitalDownload: safeData.hasDigitalDownload === true || (typeof digitalFileUrl === 'string' && !!digitalFileUrl.trim()),
+  } as Product;
+}
+
+async function productDownloadRequest(path: string, method: string, body?: Record<string, unknown>) {
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('Iniciá sesión como administrador');
+  const response = await fetch(`${API_BASE}/api/${path}`, {
+    method,
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || 'No se pudo actualizar el archivo digital privado');
+  }
+  return response.json();
+}
+
+export async function getPrivateProductDownload(productId: string): Promise<string> {
+  const data = await productDownloadRequest(`admin-product-download?productId=${encodeURIComponent(productId)}`, 'GET');
+  return data.downloadUrl || '';
+}
+
+export async function migrateLegacyProductDownloads(dryRun = false): Promise<{
+  migrated: number;
+  cleaned: number;
+  skippedInvalid: number;
+  productsToMarkReady: number;
+  productsToKeepHidden: number;
+  linksToMigrate?: { productId: string; productName: string; displayUrl: string }[];
+  invalidProducts?: { productId: string; productName: string }[];
+  previewTruncated?: boolean;
+  invalidProductsTruncated?: boolean;
+}> {
+  return productDownloadRequest('admin-migrate-product-downloads', 'POST', { dryRun });
+}
+
+async function savePrivateProductDownload(productId: string, url: string | null | undefined): Promise<void> {
+  if (url?.trim()) {
+    await productDownloadRequest('admin-product-download', 'POST', { productId, downloadUrl: url.trim() });
+  } else {
+    await productDownloadRequest('admin-product-download', 'DELETE', { productId });
+  }
+}
 
 // Fallback sample products with generated IDs
 const FALLBACK_PRODUCTS: Product[] = SAMPLE_PRODUCTS.map((p, i) => ({
@@ -30,6 +82,11 @@ const FALLBACK_PRODUCTS: Product[] = SAMPLE_PRODUCTS.map((p, i) => ({
   createdAt: Timestamp.now(),
   updatedAt: Timestamp.now(),
 }));
+
+function fallbackProducts(category?: string): Product[] {
+  if (!import.meta.env.DEV) return [];
+  return category ? FALLBACK_PRODUCTS.filter((p) => p.category === category) : FALLBACK_PRODUCTS;
+}
 
 // Memory cache with 5-minute TTL
 const CACHE_TTL = 5 * 60 * 1000;
@@ -62,6 +119,7 @@ export async function getProducts(
     let q = query(
       collection(db, COLLECTION),
       where('isActive', '==', true),
+      where('publicCatalogReady', '==', true),
       orderBy('createdAt', 'desc'),
       limit(PAGE_SIZE)
     );
@@ -70,6 +128,7 @@ export async function getProducts(
       q = query(
         collection(db, COLLECTION),
         where('isActive', '==', true),
+        where('publicCatalogReady', '==', true),
         where('category', '==', category),
         orderBy('createdAt', 'desc'),
         limit(PAGE_SIZE)
@@ -82,14 +141,12 @@ export async function getProducts(
 
     const snap = await getDocs(q);
     if (snap.empty) {
-      const filtered = category
-        ? FALLBACK_PRODUCTS.filter((p) => p.category === category)
-        : FALLBACK_PRODUCTS;
+      const filtered = fallbackProducts(category);
       const res = { products: filtered, lastVisible: null };
       if (!lastDoc) productsCache.set(cacheKey, { timestamp: Date.now(), data: res });
       return res;
     }
-    const products = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Product);
+    const products = snap.docs.map((d) => publicProduct(d.id, d.data()));
     const lastVisible = snap.docs[snap.docs.length - 1] || null;
 
     const result = { products, lastVisible };
@@ -100,13 +157,13 @@ export async function getProducts(
   } catch (err) {
     console.warn('[productService] Falta índice en Firestore, intentando consulta alternativa:', err);
     try {
-      let qAlt = query(collection(db, COLLECTION), where('isActive', '==', true));
+      let qAlt = query(collection(db, COLLECTION), where('isActive', '==', true), where('publicCatalogReady', '==', true));
       if (category) {
-        qAlt = query(collection(db, COLLECTION), where('isActive', '==', true), where('category', '==', category));
+        qAlt = query(collection(db, COLLECTION), where('isActive', '==', true), where('publicCatalogReady', '==', true), where('category', '==', category));
       }
       const snapAlt = await getDocs(qAlt);
       if (!snapAlt.empty) {
-        const prodsAlt = snapAlt.docs.map((d) => ({ id: d.id, ...d.data() }) as Product);
+        const prodsAlt = snapAlt.docs.map((d) => publicProduct(d.id, d.data()));
         prodsAlt.sort((a, b) => ((b.createdAt as any)?.seconds || 0) - ((a.createdAt as any)?.seconds || 0));
         const resAlt = { products: prodsAlt.slice(0, PAGE_SIZE), lastVisible: null };
         if (!lastDoc) productsCache.set(cacheKey, { timestamp: Date.now(), data: resAlt });
@@ -116,9 +173,7 @@ export async function getProducts(
       // continuar a muestra
     }
 
-    const filtered = category
-      ? FALLBACK_PRODUCTS.filter((p) => p.category === category)
-      : FALLBACK_PRODUCTS;
+    const filtered = fallbackProducts(category);
     const res = { products: filtered, lastVisible: null };
     if (!lastDoc) productsCache.set(cacheKey, { timestamp: Date.now(), data: res });
     return res;
@@ -132,17 +187,17 @@ export async function getAllProducts(): Promise<Product[]> {
   try {
     const q = query(collection(db, COLLECTION), orderBy('createdAt', 'desc'));
     const snap = await getDocs(q);
-    if (snap.empty) return FALLBACK_PRODUCTS;
-    return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Product);
+    if (snap.empty) return fallbackProducts();
+    return snap.docs.map((d) => publicProduct(d.id, d.data()));
   } catch (err) {
     console.warn('[productService] Error en getAllProducts ordenado, probando consulta simple:', err);
     try {
       const snap = await getDocs(collection(db, COLLECTION));
-      if (snap.empty) return FALLBACK_PRODUCTS;
-      const prods = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Product);
+      if (snap.empty) return fallbackProducts();
+      const prods = snap.docs.map((d) => publicProduct(d.id, d.data()));
       return prods.sort((a, b) => ((b.createdAt as any)?.seconds || 0) - ((a.createdAt as any)?.seconds || 0));
     } catch {
-      return FALLBACK_PRODUCTS;
+      return fallbackProducts();
     }
   }
 }
@@ -162,16 +217,22 @@ export async function getProductBySlug(slug: string): Promise<Product | null> {
   }
 
   try {
-    const q = query(collection(db, COLLECTION), where('slug', '==', slug), limit(1));
+    const q = query(
+      collection(db, COLLECTION),
+      where('slug', '==', slug),
+      where('isActive', '==', true),
+      where('publicCatalogReady', '==', true),
+      limit(1)
+    );
     const snap = await getDocs(q);
     if (!snap.empty) {
       const d = snap.docs[0];
-      return { id: d.id, ...d.data() } as Product;
+      return publicProduct(d.id, d.data());
     }
   } catch {
     // fallback
   }
-  return FALLBACK_PRODUCTS.find((p) => p.slug === slug) || null;
+  return fallbackProducts().find((p) => p.slug === slug) || null;
 }
 
 /**
@@ -190,11 +251,11 @@ export async function getProductById(id: string): Promise<Product | null> {
 
   try {
     const snap = await getDoc(doc(db, COLLECTION, id));
-    if (snap.exists()) return { id: snap.id, ...snap.data() } as Product;
+    if (snap.exists()) return publicProduct(snap.id, snap.data() || {});
   } catch {
     // fallback
   }
-  return FALLBACK_PRODUCTS.find((p) => p.id === id) || null;
+  return fallbackProducts().find((p) => p.id === id) || null;
 }
 
 /**
@@ -202,12 +263,16 @@ export async function getProductById(id: string): Promise<Product | null> {
  */
 export async function createProduct(data: ProductFormData): Promise<string> {
   clearProductsCache();
+  const { digitalFileUrl, ...publicData } = data;
   const ref = await addDoc(collection(db, COLLECTION), {
-    ...data,
-    slug: slugify(data.name),
+    ...publicData,
+    hasDigitalDownload: !!digitalFileUrl?.trim(),
+    publicCatalogReady: true,
+    slug: slugify(publicData.name),
     createdAt: Timestamp.now(),
     updatedAt: Timestamp.now(),
   });
+  await savePrivateProductDownload(ref.id, digitalFileUrl);
   return ref.id;
 }
 
@@ -219,11 +284,18 @@ export async function updateProduct(
   data: Partial<ProductFormData>
 ): Promise<void> {
   clearProductsCache();
+  const { digitalFileUrl, ...publicData } = data;
   await updateDoc(doc(db, COLLECTION, id), {
-    ...data,
-    slug: data.name ? slugify(data.name) : undefined,
+    ...publicData,
+    hasDigitalDownload: !!digitalFileUrl?.trim(),
+    // Mantenerlo oculto hasta que la API privada elimine cualquier URL legado.
+    publicCatalogReady: false,
+    slug: publicData.name ? slugify(publicData.name) : undefined,
     updatedAt: Timestamp.now(),
   });
+  if (Object.prototype.hasOwnProperty.call(data, 'digitalFileUrl')) {
+    await savePrivateProductDownload(id, digitalFileUrl);
+  }
 }
 
 /**
@@ -248,19 +320,20 @@ export async function getFeaturedProducts(count: number = 8): Promise<Product[]>
     const q = query(
       collection(db, COLLECTION),
       where('isActive', '==', true),
+      where('publicCatalogReady', '==', true),
       orderBy('createdAt', 'desc'),
       limit(count)
     );
     const snap = await getDocs(q);
     if (!snap.empty) {
-      const prods = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Product);
+      const prods = snap.docs.map((d) => publicProduct(d.id, d.data()));
       featuredCache.set(cacheKey, { timestamp: Date.now(), data: prods });
       return prods;
     }
   } catch {
     // fallback
   }
-  const fallback = FALLBACK_PRODUCTS.slice(0, count);
+  const fallback = fallbackProducts().slice(0, count);
   featuredCache.set(cacheKey, { timestamp: Date.now(), data: fallback });
   return fallback;
 }

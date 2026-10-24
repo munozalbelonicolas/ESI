@@ -31,37 +31,27 @@ export interface NotifyPurchaseData {
   shippingMethod?: string;
 }
 
+/** Devuelve el header Authorization con el ID token de Firebase del usuario actual. */
+async function authHeaders(): Promise<Record<string, string>> {
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('Iniciá sesión para continuar');
+  return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+}
+
 /**
  * Crea una preferencia de pago en Mercado Pago a través de la API route de Vercel.
+ * Solo se envía el orderId: el servidor calcula precios, descuento y envío desde Firestore.
  */
-export async function createMPPreference(
-  orderId: string,
-  items: OrderItem[],
-  payerEmail: string,
-  shippingCost: number,
-  discount: number
-): Promise<MPPreference> {
+export async function createMPPreference(orderId: string): Promise<MPPreference> {
   const res = await fetch(`${API_BASE}/api/create-mp-preference`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      orderId,
-      items: items.map((item) => ({
-        title: item.name,
-        quantity: item.quantity,
-        unit_price: item.price,
-        picture_url: item.image,
-        productId: item.productId,
-      })),
-      payer_email: payerEmail,
-      shipping_cost: shippingCost,
-      discount,
-    }),
+    headers: await authHeaders(),
+    body: JSON.stringify({ orderId }),
   });
 
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.detail || errorData.error || 'Error al crear preferencia de Mercado Pago');
+    throw new Error(errorData.error || 'Error al crear preferencia de Mercado Pago');
   }
 
   return res.json();
@@ -92,13 +82,35 @@ export async function verifyOrderPayment(orderId: string): Promise<'pending' | '
  */
 export async function sendPurchaseConfirmation(data: NotifyPurchaseData): Promise<void> {
   try {
+    // Solo se envía el orderId: el servidor arma el email desde la orden real
     await fetch(`${API_BASE}/api/notify-purchase`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ order: data, type: 'purchase' }),
+      headers: await authHeaders(),
+      body: JSON.stringify({ orderId: data.orderId }),
     });
   } catch (err) {
     // No bloquear el flujo de checkout si falla el email
     console.warn('[notify-purchase] No se pudo enviar email de confirmación:', err);
   }
+}
+
+/**
+ * Solicita al servidor el enlace de descarga seguro para un producto digital
+ * previa validación de orden, titularidad y estado 'approved'.
+ */
+export async function getDigitalDownloadUrl(orderId: string, productId: string): Promise<string> {
+  const headers = await authHeaders();
+  const res = await fetch(`${API_BASE}/api/get-digital-download`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ orderId, productId }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'No se pudo obtener el enlace de descarga');
+  }
+
+  const data = await res.json();
+  return data.downloadUrl;
 }

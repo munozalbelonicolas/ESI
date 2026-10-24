@@ -105,7 +105,7 @@ export default function AdminCouponsPage() {
                 <td>{c.type === 'percentage' ? 'Porcentaje' : 'Fijo'}</td>
                 <td>{c.type === 'percentage' ? `${c.value}%` : formatPrice(c.value)}</td>
                 <td>{c.minPurchase > 0 ? formatPrice(c.minPurchase) : '—'}</td>
-                <td>{c.usedCount}{c.maxUses > 0 ? ` / ${c.maxUses}` : ''}</td>
+                <td>{c.usedCount}{Number(c.reservedCount || 0) > 0 ? ` (+${Number(c.reservedCount)} reservados)` : ''}{c.maxUses > 0 ? ` / ${c.maxUses}` : ''}</td>
                 <td>{c.isActive ? <span className="badge badge--free">Activo</span> : <span className="badge badge--out">Inactivo</span>}</td>
                 <td>{c.expiresAt ? formatDateShort(c.expiresAt) : 'Sin vencimiento'}</td>
                 <td>
