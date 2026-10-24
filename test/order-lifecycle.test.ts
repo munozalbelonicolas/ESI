@@ -1,6 +1,6 @@
 import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { randomBytes } from 'node:crypto';
+import { createHmac, randomBytes } from 'node:crypto';
 import { initializeApp, deleteApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
@@ -14,6 +14,7 @@ process.env.RESEND_API_KEY = 'local-test-not-a-real-key';
 process.env.ADMIN_EMAIL = '';
 process.env.MP_ACCESS_TOKEN = 'TEST-local-not-a-real-token';
 process.env.CRON_SECRET = 'local-cron-secret';
+process.env.MP_WEBHOOK_SECRET = 'local-webhook-secret';
 process.env.VITE_SITE_URL = 'http://localhost:5173';
 
 const app = initializeApp({ projectId });
@@ -22,6 +23,8 @@ const auth = getAuth(app);
 const prefix = 'lifecycle-' + Date.now();
 const emails: any[] = [];
 const mpPreferences: any[] = [];
+/** Pagos que devuelve la API simulada de Mercado Pago (GET /v1/payments/:id). */
+const mpApiPayments = new Map<string, Record<string, unknown>>();
 const createdDocs: FirebaseFirestore.DocumentReference[] = [];
 const userIds: string[] = [];
 const nativeFetch = globalThis.fetch;
@@ -36,6 +39,10 @@ globalThis.fetch = async (input, init) => {
     mpPreferences.push(JSON.parse(String(init?.body)));
     return new Response(JSON.stringify({ id: 'pref-' + mpPreferences.length, init_point: 'https://example.invalid/pay' }), { status: 201 });
   }
+  const paymentMatch = /^https:\/\/api\.mercadopago\.com\/v1\/payments\/([^/?]+)/.exec(url);
+  if (paymentMatch && mpApiPayments.has(paymentMatch[1])) {
+    return new Response(JSON.stringify(mpApiPayments.get(paymentMatch[1])), { status: 200 });
+  }
   if (!/^http:\/\/(127\.0\.0\.1|localhost):/.test(url)) throw new Error('La prueba bloqueó una llamada externa: ' + url);
   return nativeFetch(input, init);
 };
@@ -46,6 +53,7 @@ const { default: adminHandler } = await import('../api/admin-approve-order.ts');
 const { default: preferenceHandler } = await import('../api/create-mp-preference.ts');
 const { default: cronHandler } = await import('../api/release-expired-coupon-reservations.ts');
 const { default: downloadHandler } = await import('../api/get-digital-download.ts');
+const { default: webhookHandler } = await import('../api/mp-webhook.ts');
 
 async function createUser(label: string, role?: 'admin') {
   const email = `${prefix}-${label}@example.test`;
@@ -377,5 +385,43 @@ describe('Cron de reservas vencidas (M4)', () => {
     assert.ok((await legacy.reservationRef.get()).data()!.expiresAt);
     assert.equal((await legacy.reservationRef.get()).data()!.status, 'released');
     assert.equal((await couponRef.get()).data()!.reservedCount, 0);
+  });
+});
+
+describe('Webhook de Mercado Pago: firma de ambos formatos', () => {
+  /** Firma como Mercado Pago: omite los pares sin valor (sin data.id en la URL no hay "id:"). */
+  function signedHeaders(urlDataId: string | undefined, requestId: string) {
+    const ts = String(Math.floor(Date.now() / 1000));
+    const manifest = (urlDataId ? `id:${urlDataId};` : '') + `request-id:${requestId};ts:${ts};`;
+    const v1 = createHmac('sha256', 'local-webhook-secret').update(manifest).digest('hex');
+    return { 'x-signature': `ts=${ts},v1=${v1}`, 'x-request-id': requestId };
+  }
+
+  for (const format of ['webhook', 'ipn'] as const) {
+    it(`procesa una notificación ${format} firmada y aprueba el pago`, async () => {
+      const { ref: couponRef, code } = await seedCoupon(`wh-${format}`, {});
+      const { orderRef } = await seedMpOrderWithCoupon(`wh-${format}`, couponRef, code, buyer.uid);
+      const paymentId = `${Date.now()}${format === 'ipn' ? 2 : 1}`;
+      track(db.collection('mpPayments').doc(paymentId));
+      mpApiPayments.set(paymentId, { id: paymentId, status: 'approved', external_reference: orderRef.id, currency_id: 'ARS', transaction_amount: 90 });
+
+      const query: Record<string, string> = format === 'webhook' ? { 'data.id': paymentId, type: 'payment' } : { id: paymentId, topic: 'payment' };
+      const body = format === 'webhook' ? { type: 'payment', data: { id: paymentId } } : { resource: paymentId, topic: 'payment' };
+      const result = await call(webhookHandler, { query, body, headers: signedHeaders(query['data.id'], `req-${format}`) });
+      assert.equal(result.code, 200, JSON.stringify(result.body));
+      assert.equal((await orderRef.get()).data()!.paymentStatus, 'approved');
+    });
+  }
+
+  it('rechaza una notificación cuya firma no corresponde a su URL', async () => {
+    const paymentId = `${Date.now()}9`;
+    // Firmada como IPN (sin id) pero enviada con data.id en la URL.
+    const result = await call(webhookHandler, {
+      query: { 'data.id': paymentId, type: 'payment' },
+      body: { type: 'payment', data: { id: paymentId } },
+      headers: signedHeaders(undefined, 'req-forged'),
+    });
+    assert.equal(result.code, 401);
+    assert.equal(result.body.reason, undefined);
   });
 });

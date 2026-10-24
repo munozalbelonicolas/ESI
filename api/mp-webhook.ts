@@ -36,9 +36,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const body = readBody(req);
-    // Formato webhook (body.type/data.id) o IPN (query topic/id)
-    const type = body.type || req.query?.type || req.query?.topic;
-    const paymentId = body?.data?.id || req.query?.['data.id'] || req.query?.id;
+    // Formato webhook (?data.id=...&type=payment) o IPN (?id=...&topic=payment)
+    const queryValue = (key: string) => {
+      const value = req.query?.[key];
+      return Array.isArray(value) ? value[0] : value;
+    };
+    const urlDataId = queryValue('data.id');
+    const type = body.type || queryValue('type') || queryValue('topic');
+    // El pago a consultar puede venir en la URL o en el cuerpo; la firma, en cambio, usa solo la URL.
+    // En formato IPN la firma no cubre el id, pero no hace falta confiar en él: el pago se vuelve a
+    // consultar a la API de Mercado Pago y se valida referencia, moneda y monto antes de aprobar.
+    const paymentId = urlDataId || queryValue('id') || body?.data?.id;
 
     if (type !== 'payment' || !paymentId) {
       return res.status(200).json({ ignored: true, reason: 'not_payment_event' });
@@ -48,13 +56,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const sigCheck = verifyMpWebhookSignature({
       xSignatureHeader: req.headers['x-signature'],
       xRequestIdHeader: req.headers['x-request-id'],
-      dataId: String(paymentId),
+      dataId: urlDataId,
       secret: mpWebhookSecret,
       toleranceMs: 5 * 60 * 1000,
     });
 
     if (!sigCheck.valid) {
-      console.error(`[Webhook] Firma de webhook de MP rechazada: ${sigCheck.reason}`);
+      // Diagnóstico sin datos sensibles: formato de la notificación y qué se usó para validar.
+      console.error('[Webhook] Firma de webhook de MP rechazada', JSON.stringify({
+        reason: sigCheck.reason,
+        format: urlDataId ? 'webhook' : queryValue('topic') ? 'ipn' : 'desconocido',
+        queryKeys: Object.keys(req.query || {}).sort(),
+        bodyKeys: Object.keys(body).sort(),
+        bodyDataIdMatchesUrl: body?.data?.id === undefined ? null : String(body.data.id) === String(urlDataId ?? queryValue('id')),
+        hasRequestId: Boolean(req.headers['x-request-id']),
+        tsDriftSeconds: sigCheck.ts ? Math.round((Date.now() - sigCheck.ts) / 1000) : null,
+        userAgent: String(req.headers['user-agent'] || '').slice(0, 60),
+      }));
       // El motivo queda en el log; responderlo ayudaría a quien intenta falsificar notificaciones.
       return res.status(401).json({ error: 'Firma de webhook inválida o expirada' });
     }

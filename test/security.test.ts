@@ -67,7 +67,7 @@ describe('1. Seguridad de Mercado Pago Webhook Signature', () => {
     assert.equal(res.reason, 'signature_mismatch');
   });
 
-  it('debe rechazar si falta la cabecera x-signature o x-request-id', () => {
+  it('debe rechazar si falta la cabecera x-signature', () => {
     const res = verifyMpWebhookSignature({
       xSignatureHeader: '',
       xRequestIdHeader: requestId,
@@ -76,7 +76,49 @@ describe('1. Seguridad de Mercado Pago Webhook Signature', () => {
     });
 
     assert.equal(res.valid, false);
-    assert.equal(res.reason, 'missing_signature_headers_or_id');
+    assert.equal(res.reason, 'missing_signature_header');
+  });
+
+  // Mercado Pago omite del manifest los pares sin valor (regla documentada y aplicada por el SDK).
+  const sign = (manifest: string) => crypto.createHmac('sha256', secret).update(manifest).digest('hex');
+
+  it('acepta una notificación IPN (?id=&topic=), que se firma sin el par id:', () => {
+    const ts = String(Math.floor(Date.now() / 1000));
+    const xSignature = `ts=${ts},v1=${sign(`request-id:${requestId};ts:${ts};`)}`;
+    const res = verifyMpWebhookSignature({ xSignatureHeader: xSignature, xRequestIdHeader: requestId, dataId: undefined, secret });
+    assert.equal(res.valid, true);
+  });
+
+  it('rechaza esa misma firma si se le agrega un data.id que no estaba firmado', () => {
+    const ts = String(Math.floor(Date.now() / 1000));
+    const xSignature = `ts=${ts},v1=${sign(`request-id:${requestId};ts:${ts};`)}`;
+    const res = verifyMpWebhookSignature({ xSignatureHeader: xSignature, xRequestIdHeader: requestId, dataId, secret });
+    assert.equal(res.valid, false);
+    assert.equal(res.reason, 'signature_mismatch');
+  });
+
+  it('acepta ts en segundos (formato documentado) y aplica la ventana de 5 minutos', () => {
+    const now = String(Math.floor(Date.now() / 1000));
+    const fresh = verifyMpWebhookSignature({
+      xSignatureHeader: `ts=${now},v1=${sign(`id:${dataId};request-id:${requestId};ts:${now};`)}`,
+      xRequestIdHeader: requestId, dataId, secret,
+    });
+    assert.equal(fresh.valid, true);
+    const old = String(Math.floor(Date.now() / 1000) - 10 * 60);
+    const stale = verifyMpWebhookSignature({
+      xSignatureHeader: `ts=${old},v1=${sign(`id:${dataId};request-id:${requestId};ts:${old};`)}`,
+      xRequestIdHeader: requestId, dataId, secret,
+    });
+    assert.equal(stale.reason, 'timestamp_out_of_tolerance');
+  });
+
+  it('sin x-request-id, valida con el manifest que lo omite', () => {
+    const ts = String(Date.now());
+    const res = verifyMpWebhookSignature({
+      xSignatureHeader: `ts=${ts},v1=${sign(`id:${dataId};ts:${ts};`)}`,
+      xRequestIdHeader: undefined, dataId, secret,
+    });
+    assert.equal(res.valid, true);
   });
 });
 
