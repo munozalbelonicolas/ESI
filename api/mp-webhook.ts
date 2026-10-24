@@ -42,11 +42,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return Array.isArray(value) ? value[0] : value;
     };
     const urlDataId = queryValue('data.id');
-    const type = body.type || queryValue('type') || queryValue('topic');
-    // El pago a consultar puede venir en la URL o en el cuerpo; la firma, en cambio, usa solo la URL.
-    // En formato IPN la firma no cubre el id, pero no hace falta confiar en él: el pago se vuelve a
-    // consultar a la API de Mercado Pago y se valida referencia, moneda y monto antes de aprobar.
-    const paymentId = urlDataId || queryValue('id') || body?.data?.id;
+
+    // IPN ("MercadoPago Feed v2.0", ?id=...&topic=...): Mercado Pago no permite validar su x-signature con
+    // la clave secreta y el canal está en vías de discontinuarse. Cada pago llega también como webhook
+    // firmado, así que el IPN se confirma con 200 (para cortar los reintentos) y no se procesa.
+    if (!urlDataId && queryValue('topic')) {
+      return res.status(200).json({ ignored: 'ipn' });
+    }
+
+    const type = body.type || queryValue('type');
+    const paymentId = urlDataId || body?.data?.id;
 
     if (type !== 'payment' || !paymentId) {
       return res.status(200).json({ ignored: true, reason: 'not_payment_event' });
@@ -65,10 +70,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Diagnóstico sin datos sensibles: formato de la notificación y qué se usó para validar.
       console.error('[Webhook] Firma de webhook de MP rechazada', JSON.stringify({
         reason: sigCheck.reason,
-        format: urlDataId ? 'webhook' : queryValue('topic') ? 'ipn' : 'desconocido',
+        format: urlDataId ? 'webhook' : 'sin data.id en la URL',
         queryKeys: Object.keys(req.query || {}).sort(),
         bodyKeys: Object.keys(body).sort(),
-        bodyDataIdMatchesUrl: body?.data?.id === undefined ? null : String(body.data.id) === String(urlDataId ?? queryValue('id')),
+        bodyDataIdMatchesUrl: body?.data?.id === undefined ? null : String(body.data.id) === String(urlDataId),
         hasRequestId: Boolean(req.headers['x-request-id']),
         tsDriftSeconds: sigCheck.ts ? Math.round((Date.now() - sigCheck.ts) / 1000) : null,
         userAgent: String(req.headers['user-agent'] || '').slice(0, 60),

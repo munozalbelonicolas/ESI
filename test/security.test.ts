@@ -82,7 +82,7 @@ describe('1. Seguridad de Mercado Pago Webhook Signature', () => {
   // Mercado Pago omite del manifest los pares sin valor (regla documentada y aplicada por el SDK).
   const sign = (manifest: string) => crypto.createHmac('sha256', secret).update(manifest).digest('hex');
 
-  it('acepta una notificación IPN (?id=&topic=), que se firma sin el par id:', () => {
+  it('sin data.id en la URL, valida con el manifest que omite el par id:', () => {
     const ts = String(Math.floor(Date.now() / 1000));
     const xSignature = `ts=${ts},v1=${sign(`request-id:${requestId};ts:${ts};`)}`;
     const res = verifyMpWebhookSignature({ xSignatureHeader: xSignature, xRequestIdHeader: requestId, dataId: undefined, secret });

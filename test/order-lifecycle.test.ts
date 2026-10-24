@@ -25,6 +25,7 @@ const emails: any[] = [];
 const mpPreferences: any[] = [];
 /** Pagos que devuelve la API simulada de Mercado Pago (GET /v1/payments/:id). */
 const mpApiPayments = new Map<string, Record<string, unknown>>();
+let mpPaymentFetches = 0;
 const createdDocs: FirebaseFirestore.DocumentReference[] = [];
 const userIds: string[] = [];
 const nativeFetch = globalThis.fetch;
@@ -41,6 +42,7 @@ globalThis.fetch = async (input, init) => {
   }
   const paymentMatch = /^https:\/\/api\.mercadopago\.com\/v1\/payments\/([^/?]+)/.exec(url);
   if (paymentMatch && mpApiPayments.has(paymentMatch[1])) {
+    mpPaymentFetches++;
     return new Response(JSON.stringify(mpApiPayments.get(paymentMatch[1])), { status: 200 });
   }
   if (!/^http:\/\/(127\.0\.0\.1|localhost):/.test(url)) throw new Error('La prueba bloqueó una llamada externa: ' + url);
@@ -397,21 +399,41 @@ describe('Webhook de Mercado Pago: firma de ambos formatos', () => {
     return { 'x-signature': `ts=${ts},v1=${v1}`, 'x-request-id': requestId };
   }
 
-  for (const format of ['webhook', 'ipn'] as const) {
-    it(`procesa una notificación ${format} firmada y aprueba el pago`, async () => {
-      const { ref: couponRef, code } = await seedCoupon(`wh-${format}`, {});
-      const { orderRef } = await seedMpOrderWithCoupon(`wh-${format}`, couponRef, code, buyer.uid);
-      const paymentId = `${Date.now()}${format === 'ipn' ? 2 : 1}`;
-      track(db.collection('mpPayments').doc(paymentId));
-      mpApiPayments.set(paymentId, { id: paymentId, status: 'approved', external_reference: orderRef.id, currency_id: 'ARS', transaction_amount: 90 });
-
-      const query: Record<string, string> = format === 'webhook' ? { 'data.id': paymentId, type: 'payment' } : { id: paymentId, topic: 'payment' };
-      const body = format === 'webhook' ? { type: 'payment', data: { id: paymentId } } : { resource: paymentId, topic: 'payment' };
-      const result = await call(webhookHandler, { query, body, headers: signedHeaders(query['data.id'], `req-${format}`) });
-      assert.equal(result.code, 200, JSON.stringify(result.body));
-      assert.equal((await orderRef.get()).data()!.paymentStatus, 'approved');
-    });
+  async function seedApprovablePayment(label: string) {
+    const { ref: couponRef, code } = await seedCoupon(label, {});
+    const { orderRef } = await seedMpOrderWithCoupon(label, couponRef, code, buyer.uid);
+    const paymentId = `${Date.now()}${label.length}`;
+    track(db.collection('mpPayments').doc(paymentId));
+    mpApiPayments.set(paymentId, { id: paymentId, status: 'approved', external_reference: orderRef.id, currency_id: 'ARS', transaction_amount: 90 });
+    return { orderRef, paymentId };
   }
+
+  it('procesa una notificación webhook firmada y aprueba el pago', async () => {
+    const { orderRef, paymentId } = await seedApprovablePayment('wh-webhook');
+    const result = await call(webhookHandler, {
+      query: { 'data.id': paymentId, type: 'payment' },
+      body: { type: 'payment', data: { id: paymentId } },
+      headers: signedHeaders(paymentId, 'req-webhook'),
+    });
+    assert.equal(result.code, 200, JSON.stringify(result.body));
+    assert.equal((await orderRef.get()).data()!.paymentStatus, 'approved');
+    assert.ok(mpPaymentFetches > 0, 'el webhook firmado debe consultar el pago a Mercado Pago');
+  });
+
+  it('confirma con 200 una notificación IPN (Feed v2.0) pero no la procesa ni consulta a Mercado Pago', async () => {
+    const { orderRef, paymentId } = await seedApprovablePayment('wh-ipn');
+    const fetchesBefore = mpPaymentFetches;
+    // Como llega en producción: la x-signature de IPN no se puede validar con la clave secreta.
+    const result = await call(webhookHandler, {
+      query: { id: paymentId, topic: 'payment' },
+      body: { resource: paymentId, topic: 'payment' },
+      headers: { 'x-signature': `ts=${Math.floor(Date.now() / 1000)},v1=${'0'.repeat(64)}`, 'x-request-id': 'req-ipn', 'user-agent': 'MercadoPago Feed v2.0 payment' },
+    });
+    assert.equal(result.code, 200);
+    assert.deepEqual(result.body, { ignored: 'ipn' });
+    assert.equal((await orderRef.get()).data()!.paymentStatus, 'pending');
+    assert.equal(mpPaymentFetches, fetchesBefore);
+  });
 
   it('rechaza una notificación cuya firma no corresponde a su URL', async () => {
     const paymentId = `${Date.now()}9`;
