@@ -10,8 +10,8 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { MercadoPagoConfig, Payment } from 'mercadopago';
-import { applyPaymentToOrder } from './_orderSync.ts';
-import { verifyMpWebhookSignature } from './_mpSignature.ts';
+import { applyPaymentToOrder } from './_orderSync.js';
+import { verifyMpWebhookSignature } from './_mpSignature.js';
 
 const mpAccessToken = process.env.MP_ACCESS_TOKEN;
 const mpWebhookSecret = process.env.MP_WEBHOOK_SECRET;

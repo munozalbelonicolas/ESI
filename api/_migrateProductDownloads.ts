@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { FieldValue } from 'firebase-admin/firestore';
-import { getAdminDb, requireUser } from './_admin.ts';
-import { handleApiCors } from './_cors.ts';
+import { getAdminDb, requireUser } from './_admin.js';
+import { handleApiCors } from './_cors.js';
 
 /** One-time admin migration: move legacy URLs out of publicly readable product documents. */
 export async function migrateProductDownloads(req: VercelRequest, res: VercelResponse) {

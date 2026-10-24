@@ -8,7 +8,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { MercadoPagoConfig, Payment } from 'mercadopago';
-import { applyPaymentToOrder, getAdminDb, requireUser } from './_orderSync.ts';
+import { applyPaymentToOrder, getAdminDb, requireUser } from './_orderSync.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {

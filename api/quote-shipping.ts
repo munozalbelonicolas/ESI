@@ -6,7 +6,7 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getCanonicalShippingQuotes, isValidShippingZipCode } from './_shipping.ts';
+import { getCanonicalShippingQuotes, isValidShippingZipCode } from './_shipping.js';
 
 function allowedOrigins(): string[] {
   const site = (process.env.VITE_SITE_URL || '').replace(/\/$/, '');

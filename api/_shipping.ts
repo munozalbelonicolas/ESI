@@ -3,7 +3,7 @@
  * Protege credenciales privadas y asegura cálculos determinísticos de tarifas.
  */
 
-import { getAdminDb } from './_admin.ts';
+import { getAdminDb } from './_admin.js';
 
 export interface ShippingQuote {
   id: string;

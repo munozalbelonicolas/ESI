@@ -7,7 +7,7 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getAdminDb, getVerifiedUserEmail, requireUser } from './_admin.ts';
+import { getAdminDb, getVerifiedUserEmail, requireUser } from './_admin.js';
 
 const esc = (v: unknown): string =>
   String(v ?? '')

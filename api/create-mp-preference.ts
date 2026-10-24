@@ -9,8 +9,8 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
-import { getAdminDb, requireUser } from './_orderSync.ts';
-import { calculateOrderShippingCost, isValidShippingZipCode } from './_shipping.ts';
+import { getAdminDb, requireUser } from './_orderSync.js';
+import { calculateOrderShippingCost, isValidShippingZipCode } from './_shipping.js';
 
 const MAX_QTY = 50;
 

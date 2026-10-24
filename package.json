@@ -11,8 +11,8 @@
     "lint:fix": "eslint . --ext .ts,.tsx --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\"",
-    "test": "node --experimental-strip-types --test test/security.test.ts",
-    "test:local": "firebase emulators:exec --config firebase.payment-test.json --only auth,firestore --project demo-esi-local \"node --experimental-strip-types --test --test-concurrency=1 test/security.test.ts test/payment-flow.test.ts test/coupon-reservations.test.ts test/firestore-rules.test.mjs\""
+    "test": "node --experimental-strip-types --import ./test/resolve-ts.mjs --test test/security.test.ts",
+    "test:local": "firebase emulators:exec --config firebase.payment-test.json --only auth,firestore --project demo-esi-local \"node --experimental-strip-types --import ./test/resolve-ts.mjs --test --test-concurrency=1 test/security.test.ts test/payment-flow.test.ts test/coupon-reservations.test.ts test/firestore-rules.test.mjs\""
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

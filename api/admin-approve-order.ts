@@ -11,9 +11,9 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { FieldValue } from 'firebase-admin/firestore';
-import { getAdminDb, requireUser } from './_admin.ts';
-import { sendOrderConfirmationEmail } from './notify-purchase.ts';
-import { settleCouponReservation } from './_couponReservations.ts';
+import { getAdminDb, requireUser } from './_admin.js';
+import { sendOrderConfirmationEmail } from './notify-purchase.js';
+import { settleCouponReservation } from './_couponReservations.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {

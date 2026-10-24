@@ -7,8 +7,8 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getAdminDb, requireUser } from './_admin.ts';
-import { freeProductDownload } from './_freeProductDownload.ts';
+import { getAdminDb, requireUser } from './_admin.js';
+import { freeProductDownload } from './_freeProductDownload.js';
 
 function allowedOrigins(): string[] {
   const site = (process.env.VITE_SITE_URL || '').replace(/\/$/, '');

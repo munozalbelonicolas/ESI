@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { FieldValue } from 'firebase-admin/firestore';
-import { getAdminDb, requireUser } from './_admin.ts';
-import { handleApiCors } from './_cors.ts';
-import { migrateProductDownloads } from './_migrateProductDownloads.ts';
+import { getAdminDb, requireUser } from './_admin.js';
+import { handleApiCors } from './_cors.js';
+import { migrateProductDownloads } from './_migrateProductDownloads.js';
 
 function validHttpsUrl(value: unknown): string | null {
   if (typeof value !== 'string' || value.length > 2048) return null;

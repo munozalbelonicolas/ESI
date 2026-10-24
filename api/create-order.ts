@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getAdminDb, requireUser } from './_admin.ts';
-import { reserveCoupon } from './_couponReservations.ts';
-import { calculateOrderShippingCost, isValidShippingZipCode } from './_shipping.ts';
+import { getAdminDb, requireUser } from './_admin.js';
+import { reserveCoupon } from './_couponReservations.js';
+import { calculateOrderShippingCost, isValidShippingZipCode } from './_shipping.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });

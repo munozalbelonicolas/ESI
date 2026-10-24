@@ -3,12 +3,12 @@
  * El prefijo "_" evita que Vercel lo exponga como endpoint.
  */
 
-import { getAdminDb } from './_admin.ts';
-import { sendOrderConfirmationEmail } from './notify-purchase.ts';
-import { calculateOrderShippingCost, isValidShippingZipCode } from './_shipping.ts';
-import { settleCouponReservation } from './_couponReservations.ts';
+import { getAdminDb } from './_admin.js';
+import { sendOrderConfirmationEmail } from './notify-purchase.js';
+import { calculateOrderShippingCost, isValidShippingZipCode } from './_shipping.js';
+import { settleCouponReservation } from './_couponReservations.js';
 
-export { ensureAdminApp, getAdminDb, requireUser } from './_admin.ts';
+export { ensureAdminApp, getAdminDb, requireUser } from './_admin.js';
 
 export type PaymentStatus = 'pending' | 'approved' | 'rejected';
 
