@@ -9,6 +9,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { MercadoPagoConfig, Payment } from 'mercadopago';
 import { applyPaymentToOrder, getAdminDb, requireUser } from './_orderSync.js';
+import { isValidDocId, readBody } from './_cors.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -24,8 +25,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const user = await requireUser(req);
     if (!user) return res.status(401).json({ error: 'No autenticado' });
 
-    const { orderId } = req.body || {};
-    if (!orderId || typeof orderId !== 'string') {
+    const { orderId } = readBody(req);
+    if (!isValidDocId(orderId)) {
       return res.status(400).json({ error: 'Faltan datos' });
     }
 

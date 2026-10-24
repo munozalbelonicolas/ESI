@@ -135,3 +135,70 @@ describe('Reglas Firestore para el catálogo público', () => {
       (error) => error.code === 'permission-denied');
   });
 });
+
+describe('Reglas Firestore para comprobantes de transferencia', () => {
+  const ownerUid = fixturePrefix + '-owner';
+  const base = 'http://' + emulatorAddress + '/v1/projects/' + projectId + '/databases/(default)/documents';
+  // El emulador acepta tokens sin firmar: permite probar las reglas como un usuario autenticado.
+  const b64 = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
+  const userToken = (uid) => b64({ alg: 'none', typ: 'JWT' }) + '.' + b64({
+    sub: uid, user_id: uid, aud: projectId, iss: 'https://securetoken.google.com/' + projectId,
+    iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 3600,
+    firebase: { sign_in_provider: 'password' },
+  }) + '.';
+  const str = (value) => ({ stringValue: value });
+  const orders = {
+    pending: { paymentMethod: 'transfer', paymentStatus: 'pending', status: 'pending' },
+    approved: { paymentMethod: 'transfer', paymentStatus: 'approved', status: 'paid' },
+    mp: { paymentMethod: 'mercadopago', paymentStatus: 'pending', status: 'pending' },
+  };
+  const orderId = (label) => fixturePrefix + '-proof-' + label;
+
+  async function writeAs(token, path, fields, mask) {
+    const query = mask ? '?' + mask.map((field) => 'updateMask.fieldPaths=' + field).join('&') : '';
+    return fetch(base + '/' + path + query, {
+      method: 'PATCH',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields }),
+    });
+  }
+  const proof = (label) => ({ orderId: str(orderId(label)), imageData: str('data:image/png;base64,AAAA') });
+
+  before(async () => {
+    for (const [label, data] of Object.entries(orders)) {
+      const fields = { userId: str(ownerUid) };
+      for (const [key, value] of Object.entries(data)) fields[key] = str(value);
+      const response = await writeAs('owner', 'orders/' + orderId(label), fields);
+      assert.equal(response.ok, true, await response.text());
+    }
+  });
+
+  after(async () => {
+    for (const label of Object.keys(orders)) {
+      for (const path of ['orders/', 'transferProofs/']) {
+        await fetch(base + '/' + path + orderId(label), { method: 'DELETE', headers: { Authorization: 'Bearer owner' } });
+      }
+    }
+  });
+
+  it('el titular adjunta el comprobante de su transferencia pendiente', async () => {
+    const response = await writeAs(userToken(ownerUid), 'transferProofs/' + orderId('pending'), proof('pending'));
+    assert.equal(response.status, 200, await response.text());
+    const order = await writeAs(userToken(ownerUid), 'orders/' + orderId('pending'), { transferProofUrl: str('firestore://x') }, ['transferProofUrl']);
+    assert.equal(order.status, 200, await order.text());
+  });
+
+  it('no permite cambiar el comprobante de un pedido ya aprobado ni de uno de Mercado Pago', async () => {
+    for (const label of ['approved', 'mp']) {
+      const response = await writeAs(userToken(ownerUid), 'transferProofs/' + orderId(label), proof(label));
+      assert.equal(response.status, 403, label);
+      const order = await writeAs(userToken(ownerUid), 'orders/' + orderId(label), { transferProofUrl: str('firestore://x') }, ['transferProofUrl']);
+      assert.equal(order.status, 403, label);
+    }
+  });
+
+  it('otro usuario no puede adjuntar comprobantes a un pedido ajeno', async () => {
+    const response = await writeAs(userToken(fixturePrefix + '-intruder'), 'transferProofs/' + orderId('pending'), proof('pending'));
+    assert.equal(response.status, 403);
+  });
+});

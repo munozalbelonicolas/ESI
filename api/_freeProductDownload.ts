@@ -1,10 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getAdminDb } from './_admin.js';
+import { isValidDocId } from './_cors.js';
 
 export async function freeProductDownload(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   const productId = req.query?.productId;
-  if (typeof productId !== 'string' || !productId.trim()) {
+  if (!isValidDocId(productId)) {
     return res.status(400).json({ error: 'productId requerido' });
   }
 

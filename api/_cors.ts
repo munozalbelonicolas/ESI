@@ -16,3 +16,22 @@ export function handleApiCors(req: VercelRequest, res: VercelResponse, methods: 
   }
   return false;
 }
+
+/**
+ * Cuerpo JSON de la solicitud, o {} si falta o es inválido.
+ * Vercel parsea req.body de forma perezosa y lanza ante JSON mal formado; así la validación de cada
+ * endpoint responde 400 en lugar de un 500.
+ */
+export function readBody(req: VercelRequest): Record<string, any> {
+  try {
+    const body = req.body;
+    return body && typeof body === 'object' && !Array.isArray(body) ? body : {};
+  } catch {
+    return {};
+  }
+}
+
+/** IDs de documentos de Firestore aceptados en parámetros (evita rutas con "/" o "..", y valores gigantes). */
+export function isValidDocId(value: unknown): value is string {
+  return typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value);
+}

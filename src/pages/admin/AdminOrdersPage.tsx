@@ -93,16 +93,23 @@ export default function AdminOrdersPage() {
                 <td>{o.items.length} items</td>
                 <td style={{ fontWeight: 700 }}>{formatPrice(o.total)}</td>
                 <td>
-                  <select className="form-select" value={o.paymentStatus} onChange={e => handlePaymentChange(o.id, e.target.value as PaymentStatus)} style={{ padding: '4px 8px', fontSize: 'var(--text-xs)', minWidth: 100 }}>
+                  {(o.paymentMismatch || o.stockShortage?.length) && (
+                    <div role="alert" style={{ fontSize: 'var(--text-xs)', color: 'var(--color-error)', marginBottom: 4, maxWidth: 180 }}>
+                      {o.paymentMismatch && <div>⚠ Revisar pago: {o.paymentMismatch}</div>}
+                      {o.stockShortage?.length ? <div>⚠ Sin stock: {o.stockShortage.map(s => `${s.name} (${s.available}/${s.requested})`).join(', ')}</div> : null}
+                    </div>
+                  )}
+                  <select className="form-select" aria-label={`Estado de pago del pedido ${o.id.slice(0, 8)}`} value={o.paymentStatus} onChange={e => handlePaymentChange(o.id, e.target.value as PaymentStatus)} style={{ padding: '4px 8px', fontSize: 'var(--text-xs)', minWidth: 100 }}>
                     <option value="pending">Pendiente</option>
                     <option value="approved" disabled={o.paymentMethod === 'mercadopago'}>
                       {o.paymentMethod === 'mercadopago' ? 'Aprobado (validación MP)' : 'Aprobado'}
                     </option>
-                    <option value="rejected">Rechazado</option>
+                    <option value="rejected" disabled={o.paymentStatus === 'approved'}>Rechazado</option>
+                    <option value="refunded" disabled={o.paymentStatus !== 'approved' && o.paymentStatus !== 'refunded'}>Reembolsado (revoca descargas)</option>
                   </select>
                 </td>
                 <td>
-                  <select className="form-select" value={o.status} onChange={e => handleStatusChange(o.id, e.target.value as OrderStatus)} style={{ padding: '4px 8px', fontSize: 'var(--text-xs)', minWidth: 100 }}>
+                  <select className="form-select" aria-label={`Estado del pedido ${o.id.slice(0, 8)}`} value={o.status} onChange={e => handleStatusChange(o.id, e.target.value as OrderStatus)} style={{ padding: '4px 8px', fontSize: 'var(--text-xs)', minWidth: 100 }}>
                     {Object.entries(ORDER_STATUS_LABELS).map(([k, v]) => (
                       <option key={k} value={k} disabled={k === 'paid' && o.paymentMethod === 'mercadopago'}>
                         {k === 'paid' && o.paymentMethod === 'mercadopago' ? 'Pagada (validación MP)' : v}

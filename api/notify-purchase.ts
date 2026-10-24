@@ -8,6 +8,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getAdminDb, getVerifiedUserEmail, requireUser } from './_admin.js';
+import { isValidDocId, readBody } from './_cors.js';
 
 const esc = (v: unknown): string =>
   String(v ?? '')
@@ -328,8 +329,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const user = await requireUser(req);
     if (!user) return res.status(401).json({ error: 'No autenticado' });
 
-    const orderId = req.body?.orderId ?? req.body?.order?.orderId;
-    if (!orderId || typeof orderId !== 'string') {
+    const body = readBody(req);
+    const orderId = body.orderId ?? body.order?.orderId;
+    if (!isValidDocId(orderId)) {
       return res.status(400).json({ error: 'orderId requerido' });
     }
 

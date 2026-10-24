@@ -61,7 +61,7 @@ export async function createMPPreference(orderId: string): Promise<MPPreference>
  * Verifica contra Mercado Pago el estado real de una orden (lo hace el servidor)
  * y devuelve el paymentStatus resultante.
  */
-export async function verifyOrderPayment(orderId: string): Promise<'pending' | 'approved' | 'rejected'> {
+export async function verifyOrderPayment(orderId: string): Promise<'pending' | 'approved' | 'rejected' | 'refunded'> {
   const token = await auth.currentUser?.getIdToken();
   if (!token) throw new Error('Iniciá sesión para verificar tu pago');
   const res = await fetch(`${API_BASE}/api/verify-payment`, {

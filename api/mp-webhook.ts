@@ -12,6 +12,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { MercadoPagoConfig, Payment } from 'mercadopago';
 import { applyPaymentToOrder } from './_orderSync.js';
 import { verifyMpWebhookSignature } from './_mpSignature.js';
+import { readBody } from './_cors.js';
 
 const mpAccessToken = process.env.MP_ACCESS_TOKEN;
 const mpWebhookSecret = process.env.MP_WEBHOOK_SECRET;
@@ -34,7 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const body = req.body || {};
+    const body = readBody(req);
     // Formato webhook (body.type/data.id) o IPN (query topic/id)
     const type = body.type || req.query?.type || req.query?.topic;
     const paymentId = body?.data?.id || req.query?.['data.id'] || req.query?.id;
@@ -54,7 +55,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (!sigCheck.valid) {
       console.error(`[Webhook] Firma de webhook de MP rechazada: ${sigCheck.reason}`);
-      return res.status(401).json({ error: 'Firma de webhook inválida o expirada', reason: sigCheck.reason });
+      // El motivo queda en el log; responderlo ayudaría a quien intenta falsificar notificaciones.
+      return res.status(401).json({ error: 'Firma de webhook inválida o expirada' });
     }
 
     if (!mpAccessToken) {

@@ -1,6 +1,8 @@
 import type { Transaction, DocumentReference, Firestore } from 'firebase-admin/firestore';
 
 export const COUPON_RESERVATION_MS = 24 * 60 * 60 * 1000;
+/** Las transferencias tardan más en acreditarse, pero la reserva no puede ser eterna (agotaría el cupón). */
+export const TRANSFER_COUPON_RESERVATION_MS = 72 * 60 * 60 * 1000;
 
 /** Reglas de elegibilidad compartidas entre la validación del checkout y la reserva. */
 export function isCouponEligible(coupon: FirebaseFirestore.DocumentData, subtotal: unknown, now = Date.now()): boolean {
@@ -31,10 +33,12 @@ export async function reserveCoupon(
   couponCode: unknown,
   subtotal: unknown,
   paymentMethod: unknown,
-  userId: string
-): Promise<{ couponCode: string | null; reservationId: string | null; couponDiscount: number }> {
+  userId: string,
+  /** Recibe el descuento calculado; true consume el cupón en el acto (pedido que no requiere pago). */
+  consumeNow?: (couponDiscount: number) => boolean
+): Promise<{ couponCode: string | null; reservationId: string | null; couponDiscount: number; consumed: boolean }> {
   if (typeof couponCode !== 'string' || !couponCode.trim()) {
-    return { couponCode: null, reservationId: null, couponDiscount: 0 };
+    return { couponCode: null, reservationId: null, couponDiscount: 0, consumed: false };
   }
   const normalizedCode = couponCode.trim().toUpperCase();
   const couponQuery = db.collection('coupons').where('code', '==', normalizedCode).limit(1);
@@ -60,28 +64,26 @@ export async function reserveCoupon(
 
   const reservationId = orderRef.id;
   const reservationRef = db.collection('couponReservations').doc(reservationId);
-  const reservationExpiry = paymentMethod === 'mercadopago'
-    ? new Date(now + COUPON_RESERVATION_MS)
-    : null;
+  const couponDiscount = coupon.type === 'percentage'
+    ? Math.round((Number(subtotal) * value) / 100)
+    : Math.min(value, Number(subtotal));
+  const consumed = consumeNow?.(couponDiscount) === true;
+  const reservationExpiry = new Date(now + (paymentMethod === 'mercadopago' ? COUPON_RESERVATION_MS : TRANSFER_COUPON_RESERVATION_MS));
   transaction.create(reservationRef, {
     orderId: orderRef.id,
     userId,
     couponId: couponDoc.id,
     couponCode: normalizedCode,
-    status: 'reserved',
+    status: consumed ? 'consumed' : 'reserved',
     paymentMethod,
     expiresAt: reservationExpiry,
     createdAt: new Date(now),
     updatedAt: new Date(now),
   });
-  transaction.update(couponDoc.ref, {
-    reservedCount: reservedCount + 1,
-    updatedAt: new Date(now),
-  });
-  const couponDiscount = coupon.type === 'percentage'
-    ? Math.round((Number(subtotal) * value) / 100)
-    : Math.min(value, Number(subtotal));
-  return { couponCode: normalizedCode, reservationId, couponDiscount };
+  transaction.update(couponDoc.ref, consumed
+    ? { usedCount: Number(coupon.usedCount || 0) + 1, updatedAt: new Date(now) }
+    : { reservedCount: reservedCount + 1, updatedAt: new Date(now) });
+  return { couponCode: normalizedCode, reservationId, couponDiscount, consumed };
 }
 
 /** Debe invocarse dentro de una transacción después de leer la reserva y el cupón. */

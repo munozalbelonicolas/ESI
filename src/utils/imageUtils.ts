@@ -4,7 +4,7 @@
  */
 
 export function getOptimizedImageUrl(url?: string | null, width: number = 500): string {
-  if (!url) return '/placeholder-product.png';
+  if (!url) return '/placeholder-product.svg';
 
   // Si es una URL de Cloudinary
   if (url.includes('cloudinary.com') && url.includes('/upload/')) {

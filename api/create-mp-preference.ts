@@ -11,6 +11,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
 import { getAdminDb, requireUser } from './_orderSync.js';
 import { calculateOrderShippingCost, isValidShippingZipCode } from './_shipping.js';
+import { isValidDocId, readBody } from './_cors.js';
 
 const MAX_QTY = 50;
 
@@ -46,8 +47,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const user = await requireUser(req);
     if (!user) return res.status(401).json({ error: 'No autenticado' });
 
-    const { orderId } = req.body || {};
-    if (!orderId || typeof orderId !== 'string') {
+    const { orderId } = readBody(req);
+    if (!isValidDocId(orderId)) {
       return res.status(400).json({ error: 'orderId requerido' });
     }
 
@@ -64,6 +65,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     let couponReservationExpiry: Date | null = null;
+    let reservedCoupon: FirebaseFirestore.DocumentData | null = null;
     if (order.couponCode) {
       const reservationId = String(order.couponReservationId || orderId);
       const reservationSnap = await db.collection('couponReservations').doc(reservationId).get();
@@ -73,6 +75,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(409).json({ error: 'La reserva del cupón venció. Volvé al carrito para crear un pedido nuevo.' });
       }
       couponReservationExpiry = expiry;
+      // La reserva garantiza el descuento: si el cupón se desactiva o vence después, se respeta igual
+      // (antes se cobraba precio completo y el cupón se consumía al aprobar).
+      const couponSnap = await db.collection('coupons').doc(String(reservation?.couponId || '')).get();
+      if (!couponSnap.exists) {
+        return res.status(409).json({ error: 'El cupón del pedido ya no existe. Volvé al carrito para crear un pedido nuevo.' });
+      }
+      reservedCoupon = couponSnap.data() || null;
     }
 
     const orderItems: any[] = Array.isArray(order.items) ? order.items : [];
@@ -115,27 +124,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       subtotal += price * qty;
     }
 
-    // Cupón: se revalida exclusivamente en servidor contra el documento de Firestore
+    // Cupón: tipo y valor del cupón reservado, aplicados sobre el subtotal recalculado en el servidor.
     let discountAmount = 0;
-    if (order.couponCode && typeof order.couponCode === 'string') {
-      const cSnap = await db
-        .collection('coupons')
-        .where('code', '==', order.couponCode.toUpperCase())
-        .where('isActive', '==', true)
-        .limit(1)
-        .get();
-      if (!cSnap.empty) {
-        const c = cSnap.docs[0].data();
-        const expired = c.expiresAt && typeof c.expiresAt.toMillis === 'function' && c.expiresAt.toMillis() < Date.now();
-        const exhausted = Number(c.maxUses) > 0 && Number(c.usedCount || 0) + Number(c.reservedCount || 0) > Number(c.maxUses);
-        const belowMin = subtotal < Number(c.minPurchase || 0);
-        if (!expired && !exhausted && !belowMin) {
-          discountAmount =
-            c.type === 'percentage'
-              ? Math.round((subtotal * Number(c.value)) / 100)
-              : Math.min(Number(c.value), subtotal);
-          discountAmount = Math.max(0, Math.min(discountAmount, subtotal));
-        }
+    if (reservedCoupon) {
+      const value = Number(reservedCoupon.value);
+      if (Number.isFinite(value) && value > 0) {
+        discountAmount = reservedCoupon.type === 'percentage'
+          ? Math.round((subtotal * Math.min(value, 100)) / 100)
+          : Math.min(value, subtotal);
+        discountAmount = Math.max(0, Math.min(discountAmount, subtotal));
       }
     }
     const discountFactor = subtotal > 0 ? (subtotal - discountAmount) / subtotal : 1;
@@ -161,14 +158,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    const mpItems: any[] = lines.map((l) => ({
-      id: l.id,
-      title: l.title,
-      quantity: l.quantity,
-      unit_price: Math.max(0.01, Math.round(l.price * discountFactor * 100) / 100),
-      currency_id: 'ARS',
-      ...(l.picture ? { picture_url: l.picture } : {}),
-    }));
+    // Los pedidos de $0 se aprueban al crearse; nunca se manda un cobro simbólico a Mercado Pago.
+    if (subtotal - discountAmount + shipping <= 0) {
+      return res.status(409).json({ error: 'Este pedido no requiere pago' });
+    }
+    const mpItems: any[] = lines
+      .map((l) => ({
+        id: l.id,
+        title: l.title,
+        quantity: l.quantity,
+        unit_price: Math.round(l.price * discountFactor * 100) / 100,
+        currency_id: 'ARS',
+        ...(l.picture ? { picture_url: l.picture } : {}),
+      }))
+      .filter((item) => item.unit_price > 0);
     if (shipping > 0) {
       mpItems.push({ id: 'shipping', title: 'Envío', quantity: 1, unit_price: shipping, currency_id: 'ARS' });
     }
@@ -193,6 +196,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       auto_return: 'approved',
       statement_descriptor: 'ESI Secundaria',
     };
+    const mpSettings = (await db.collection('settings').doc('mercadopago').get()).data() || {};
+    const maxInstallments = Number(mpSettings.maxInstallments);
+    if (Number.isInteger(maxInstallments) && maxInstallments >= 1 && maxInstallments <= 12) {
+      preferenceData.payment_methods = { installments: maxInstallments };
+    }
     if (couponReservationExpiry) {
       preferenceData.expires = true;
       preferenceData.expiration_date_from = new Date().toISOString();

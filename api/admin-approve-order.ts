@@ -12,8 +12,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminDb, requireUser } from './_admin.js';
+import { isValidDocId, readBody } from './_cors.js';
 import { sendOrderConfirmationEmail } from './notify-purchase.js';
 import { settleCouponReservation } from './_couponReservations.js';
+import { collectPhysicalProducts, consumeCouponOnApproval, decrementStock, findStockShortages } from './_fulfillment.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -26,8 +28,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(403).json({ error: 'Acceso restringido a administradores' });
     }
 
-    const { orderId } = req.body || {};
-    if (!orderId || typeof orderId !== 'string') {
+    // /api/admin-update-order se reescribe a ?action=update (límite de 12 funciones en Hobby)
+    if (req.query?.action === 'update') return updateOrder(req, res, user.uid);
+
+    const { orderId } = readBody(req);
+    if (!isValidDocId(orderId)) {
       return res.status(400).json({ error: 'orderId requerido' });
     }
 
@@ -114,36 +119,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         reservedCouponSnap = await trx.get(db.collection('coupons').doc(reservationSnap.data()!.couponId));
       }
 
-      // 1. Descontar stock para los productos que el servidor identifica como físicos.
-      const physicalProducts = new Map<string, { snap: FirebaseFirestore.DocumentSnapshot; quantity: number }>();
-      for (let index = 0; index < items.length; index++) {
-        const item = items[index];
-        const pSnap = productSnaps[index];
-        if (!pSnap?.exists || pSnap.data()?.isDigital === true) continue;
-        const quantity = Number(item.quantity);
-        if (!Number.isInteger(quantity) || quantity < 1) continue;
-        const productId = String(item.productId);
-        const existing = physicalProducts.get(productId);
-        physicalProducts.set(productId, { snap: pSnap, quantity: (existing?.quantity || 0) + quantity });
+      // 1. Stock: el admin decide antes de aprobar, así que un faltante bloquea la aprobación.
+      const physicalProducts = collectPhysicalProducts(items, productSnaps);
+      const shortages = findStockShortages(physicalProducts);
+      if (shortages.length) {
+        const error: any = new Error('STOCK_INSUFFICIENT');
+        error.shortages = shortages;
+        throw error;
       }
-      for (const { snap, quantity } of physicalProducts.values()) {
-        const currentStock = snap.data()?.stock;
-        if (typeof currentStock === 'number' && currentStock !== -1) {
-          trx.update(snap.ref, {
-            stock: Math.max(0, currentStock - quantity),
-            updatedAt: new Date(),
-          });
-        }
-      }
+      decrementStock(trx, physicalProducts);
 
-      // 2. Incrementar cupón atómicamente si corresponde.
-      if (reservationSnap?.exists && reservationSnap.data()?.status !== 'reserved') {
-        throw new Error('COUPON_RESERVATION_LOST');
-      }
-      if (reservationSnap?.exists && reservationSnap.data()?.status === 'reserved' && reservedCouponSnap?.exists) {
-        settleCouponReservation(trx, reservationRef, reservationSnap.data()!, reservedCouponSnap.ref, reservedCouponSnap.data()!, 'consumed');
-      } else if (reservationSnap?.exists && !reservedCouponSnap?.exists) {
-        throw new Error('COUPON_RESERVATION_LOST');
+      // 2. Cupón: consume la reserva (o la vuelve a consumir si venció y todavía hay cupo).
+      if (reservationSnap?.exists) {
+        consumeCouponOnApproval(trx, reservationRef, reservationSnap, reservedCouponSnap);
       } else if (couponSnap && !couponSnap.empty) {
         const coupon = couponSnap.docs[0].data();
         const maxUses = Number(coupon.maxUses || 0);
@@ -206,7 +194,92 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (error?.message === 'COUPON_RESERVATION_LOST' || error?.message === 'COUPON_CAP_REACHED') {
       return res.status(409).json({ error: 'La reserva del cupón no está disponible. Revisá el pedido antes de aprobarlo.' });
     }
+    if (error?.message === 'STOCK_INSUFFICIENT') {
+      const names = (error.shortages || []).map((s: any) => `${s.name} (hay ${s.available}, pide ${s.requested})`).join(', ');
+      return res.status(409).json({ error: `Stock insuficiente: ${names}. Ajustá el stock o cancelá el pedido.` });
+    }
     console.error('[AdminApprove] Error aprobando orden:', error?.message || error);
     return res.status(500).json({ error: 'Error al aprobar la orden' });
+  }
+}
+
+const ORDER_STATUSES = ['pending', 'paid', 'shipped', 'delivered', 'cancelled'] as const;
+const PAYMENT_STATUSES = ['pending', 'rejected', 'refunded'] as const;
+
+/**
+ * Cambios de estado hechos por el admin. Pasan por el servidor para que cancelar o rechazar
+ * libere la reserva del cupón (antes eran escrituras directas en Firestore que la dejaban tomada).
+ * La aprobación tiene su propio flujo (stock, cupón y email) y no se hace por aquí.
+ */
+async function updateOrder(req: VercelRequest, res: VercelResponse, adminUid: string) {
+  const { orderId, status, paymentStatus } = readBody(req);
+  if (!isValidDocId(orderId)) return res.status(400).json({ error: 'orderId requerido' });
+  if (status !== undefined && !ORDER_STATUSES.includes(status)) return res.status(400).json({ error: 'Estado inválido' });
+  if (paymentStatus !== undefined && !PAYMENT_STATUSES.includes(paymentStatus)) {
+    return res.status(400).json({ error: 'Estado de pago inválido' });
+  }
+  if (status === undefined && paymentStatus === undefined) return res.status(400).json({ error: 'Nada para actualizar' });
+  if (status === 'paid') return res.status(400).json({ error: 'Para marcar como pagado usá la aprobación del pedido' });
+
+  const db = getAdminDb();
+  const orderRef = db.collection('orders').doc(orderId);
+  try {
+    await db.runTransaction(async (trx) => {
+      const orderSnap = await trx.get(orderRef);
+      if (!orderSnap.exists) throw new Error('NOT_FOUND');
+      const order = orderSnap.data() || {};
+      const approved = order.paymentStatus === 'approved';
+
+      const updates: Record<string, unknown> = { updatedAt: new Date(), lastUpdatedBy: adminUid };
+      let releaseCoupon = false;
+
+      if (paymentStatus === 'refunded') {
+        if (!approved) throw new Error('REFUND_REQUIRES_APPROVED');
+        // Revoca las descargas (exigen 'approved'). En Mercado Pago, el dinero se devuelve desde su panel.
+        Object.assign(updates, { paymentStatus: 'refunded', status: 'cancelled', refundedAt: new Date(), refundReason: 'admin' });
+      } else if (paymentStatus === 'pending' || paymentStatus === 'rejected') {
+        if (approved) throw new Error('APPROVED_LOCKED');
+        if (order.paymentStatus === 'refunded') throw new Error('REFUNDED_LOCKED');
+        updates.paymentStatus = paymentStatus;
+        if (paymentStatus === 'rejected') {
+          updates.status = 'cancelled';
+          releaseCoupon = true;
+        }
+      }
+
+      if (status !== undefined && updates.status === undefined) {
+        if ((status === 'shipped' || status === 'delivered') && !approved) throw new Error('NOT_PAID');
+        if (status === 'pending' && approved) throw new Error('APPROVED_LOCKED');
+        if (status !== 'cancelled' && order.paymentStatus === 'refunded') throw new Error('REFUNDED_LOCKED');
+        if (status === 'cancelled' && approved) throw new Error('CANCEL_APPROVED');
+        updates.status = status;
+        if (status === 'cancelled') releaseCoupon = true;
+      }
+
+      if (releaseCoupon && order.couponReservationId) {
+        const reservationRef = db.collection('couponReservations').doc(String(order.couponReservationId));
+        const reservationSnap = await trx.get(reservationRef);
+        const couponId = reservationSnap.data()?.couponId;
+        const couponSnap = typeof couponId === 'string' ? await trx.get(db.collection('coupons').doc(couponId)) : null;
+        if (reservationSnap.exists && couponSnap?.exists) {
+          settleCouponReservation(trx, reservationRef, reservationSnap.data()!, couponSnap.ref, couponSnap.data()!, 'released');
+        }
+      }
+      trx.update(orderRef, updates);
+    });
+    return res.status(200).json({ success: true });
+  } catch (error: any) {
+    const messages: Record<string, [number, string]> = {
+      NOT_FOUND: [404, 'Orden no encontrada'],
+      REFUND_REQUIRES_APPROVED: [409, 'Solo se puede marcar como reembolsado un pedido aprobado'],
+      APPROVED_LOCKED: [409, 'Un pedido aprobado no vuelve a pendiente ni rechazado; marcalo como reembolsado'],
+      REFUNDED_LOCKED: [409, 'El pedido fue reembolsado y ya no admite cambios de estado'],
+      NOT_PAID: [409, 'Solo se puede enviar o entregar un pedido con el pago aprobado'],
+      CANCEL_APPROVED: [409, 'Para cancelar un pedido pagado, marcá el pago como reembolsado'],
+    };
+    const known = messages[error?.message];
+    if (known) return res.status(known[0]).json({ error: known[1] });
+    console.error('[AdminUpdateOrder] Error:', error?.message || error);
+    return res.status(500).json({ error: 'No se pudo actualizar el pedido' });
   }
 }

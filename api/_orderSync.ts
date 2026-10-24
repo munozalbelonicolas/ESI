@@ -6,15 +6,16 @@
 import { getAdminDb } from './_admin.js';
 import { sendOrderConfirmationEmail } from './notify-purchase.js';
 import { calculateOrderShippingCost, isValidShippingZipCode } from './_shipping.js';
-import { settleCouponReservation } from './_couponReservations.js';
+import { collectPhysicalProducts, consumeCouponOnApproval, decrementStock, findStockShortages } from './_fulfillment.js';
 
 export { ensureAdminApp, getAdminDb, requireUser } from './_admin.js';
 
-export type PaymentStatus = 'pending' | 'approved' | 'rejected';
+export type PaymentStatus = 'pending' | 'approved' | 'rejected' | 'refunded';
 
 export function mapMpStatus(mpStatus?: string): PaymentStatus {
   if (mpStatus === 'approved') return 'approved';
   if (mpStatus === 'rejected' || mpStatus === 'cancelled') return 'rejected';
+  if (mpStatus === 'refunded' || mpStatus === 'charged_back') return 'refunded';
   return 'pending';
 }
 
@@ -128,6 +129,27 @@ export async function applyPaymentToOrder(
   const orderData = orderSnap.data() || {};
   const alreadyApproved = orderData.paymentStatus === 'approved';
 
+  // Reembolso o contracargo: revoca el acceso a las descargas (exigen paymentStatus 'approved').
+  if (paymentStatus === 'refunded') {
+    const finalStatus = await db.runTransaction(async (transaction): Promise<PaymentStatus> => {
+      const fresh = (await transaction.get(orderRef)).data() || {};
+      // Solo el pago que aprobó la orden puede revertirla.
+      if (fresh.paymentStatus === 'approved' && fresh.mpPaymentId && String(fresh.mpPaymentId) !== mpPaymentId) {
+        return 'approved';
+      }
+      transaction.update(orderRef, {
+        paymentStatus: 'refunded',
+        status: 'cancelled',
+        refundedAt: new Date(),
+        refundReason: String(payment.status || 'refunded'),
+        updatedAt: new Date(),
+      });
+      return 'refunded';
+    });
+    if (finalStatus === 'refunded') console.warn(`[OrderSync] Orden ${orderId} revertida por ${payment.status} del pago ${mpPaymentId}`);
+    return { found: true, paymentStatus: finalStatus };
+  }
+
   // Nunca degradar una orden ya aprobada
   if (alreadyApproved && paymentStatus !== 'approved') {
     return { found: true, paymentStatus: 'approved' };
@@ -209,6 +231,7 @@ export async function applyPaymentToOrder(
       return { found: true, paymentStatus: 'pending', mismatch: true };
     }
     let shouldSendEmail = false;
+    let stockShortages: ReturnType<typeof findStockShortages> = [];
 
     try {
       await db.runTransaction(async (transaction) => {
@@ -231,17 +254,9 @@ export async function applyPaymentToOrder(
         const productSnaps = await Promise.all(
           items.map((it) => transaction.get(db.collection('products').doc(String(it.productId || ''))))
         );
-        const physicalProducts = new Map<string, { snap: FirebaseFirestore.DocumentSnapshot; quantity: number }>();
-        items.forEach((item, index) => {
-          const snap = productSnaps[index];
-          const productId = String(item.productId);
-          if (!snap?.exists || snap.data()?.isDigital === true) return;
-          const existing = physicalProducts.get(productId);
-          physicalProducts.set(productId, {
-            snap,
-            quantity: (existing?.quantity || 0) + Number(item.quantity),
-          });
-        });
+        const physicalProducts = collectPhysicalProducts(items, productSnaps);
+        // El cliente ya pagó: se aprueba igual, pero el faltante queda marcado para que el admin lo resuelva.
+        stockShortages = findStockShortages(physicalProducts);
 
         const reservationRef = db.collection('couponReservations').doc(String(orderData.couponReservationId || orderId));
         const reservationSnap = orderData.couponCode ? await transaction.get(reservationRef) : null;
@@ -278,30 +293,18 @@ export async function applyPaymentToOrder(
           expectedTotal,
           ...(orderData.userId && !orderData.emailSent ? { emailSent: true } : {}),
           paymentMismatch: null,
+          stockShortage: stockShortages.length ? stockShortages : null,
           updatedAt: new Date(),
         });
         shouldSendEmail = !!orderData.userId && !orderData.emailSent;
 
         // C. Descontar stock
-        for (const { snap, quantity } of physicalProducts.values()) {
-          const currentStock = snap.data()?.stock;
-          if (currentStock !== undefined && currentStock !== null && currentStock !== -1) {
-            transaction.update(snap.ref, {
-              stock: Math.max(0, Number(currentStock) - quantity),
-              updatedAt: new Date(),
-            });
-          }
-        }
+        decrementStock(transaction, physicalProducts);
 
-        // D. Incrementar cupón si aplica
-        if (reservationSnap?.exists && reservationSnap.data()?.status !== 'reserved') {
-          throw new Error('COUPON_RESERVATION_LOST');
-        }
-        if (reservationSnap?.exists && reservationSnap.data()?.status === 'reserved' && couponSnap?.exists) {
-          settleCouponReservation(transaction, reservationRef, reservationSnap.data()!, couponSnap.ref, couponSnap.data()!, 'consumed');
-        } else if (reservationSnap?.exists && !couponSnap?.exists) {
-          throw new Error('COUPON_RESERVATION_LOST');
-        } else if (couponSnap && couponSnap.exists && !reservationSnap?.exists) {
+        // D. Consumir el cupón (incluye reservas liberadas por un intento rechazado previo)
+        if (reservationSnap?.exists) {
+          consumeCouponOnApproval(transaction, reservationRef, reservationSnap, couponSnap);
+        } else if (couponSnap && couponSnap.exists) {
           const cData = couponSnap.data() || {};
           const currentCount = Number(cData.usedCount || 0);
           const maxUses = Number(cData.maxUses || 0);
@@ -351,32 +354,23 @@ export async function applyPaymentToOrder(
       }
     }
 
+    if (stockShortages.length) {
+      console.error(`[OrderSync] Orden ${orderId} aprobada con stock insuficiente: ${stockShortages.map((s) => `${s.productId} (${s.available}/${s.requested})`).join(', ')}`);
+    }
     console.log(`[OrderSync] Orden ${orderId} aprobada exitosamente con pago ${mpPaymentId}`);
     return { found: true, paymentStatus: 'approved' };
   }
 
   // Recheck approval inside the transaction: a delayed pending/rejected event
   // must never overwrite a concurrent approved payment.
+  // Un rechazo NO libera la reserva del cupón: la preferencia de MP sigue vigente y el comprador puede
+  // reintentar con otro medio. La reserva se libera al vencer (cron) o al cancelar el pedido.
   const finalStatus = await db.runTransaction(async (transaction): Promise<PaymentStatus> => {
-      const freshOrder = await transaction.get(orderRef);
-      if (!freshOrder.exists) throw new Error('ORDER_NOT_FOUND');
-      const fresh = freshOrder.data()!;
-      if (fresh.paymentStatus === 'approved') return 'approved';
-      if (paymentStatus !== 'rejected' || !fresh.couponCode) {
-        transaction.update(orderRef, { paymentStatus, mpPaymentId, updatedAt: new Date() });
-        return paymentStatus;
-      }
-      const reservationRef = db.collection('couponReservations').doc(String(fresh.couponReservationId || orderId));
-      const reservationSnap = await transaction.get(reservationRef);
-      let couponSnap: FirebaseFirestore.DocumentSnapshot | null = null;
-      if (reservationSnap.exists && typeof reservationSnap.data()?.couponId === 'string') {
-        couponSnap = await transaction.get(db.collection('coupons').doc(reservationSnap.data()!.couponId));
-      }
-      if (reservationSnap.exists && couponSnap?.exists && reservationSnap.data()?.status === 'reserved') {
-        settleCouponReservation(transaction, reservationRef, reservationSnap.data()!, couponSnap.ref, couponSnap.data()!, 'released');
-      }
-      transaction.update(orderRef, { paymentStatus, mpPaymentId, updatedAt: new Date() });
-      return paymentStatus;
+    const freshOrder = await transaction.get(orderRef);
+    if (!freshOrder.exists) throw new Error('ORDER_NOT_FOUND');
+    if (freshOrder.data()!.paymentStatus === 'approved') return 'approved';
+    transaction.update(orderRef, { paymentStatus, mpPaymentId, updatedAt: new Date() });
+    return paymentStatus;
   });
   console.log(`[OrderSync] Orden ${orderId} actualizada: ${finalStatus}`);
   return { found: true, paymentStatus: finalStatus };

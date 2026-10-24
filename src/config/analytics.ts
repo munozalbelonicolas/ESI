@@ -15,8 +15,9 @@ export function initAnalytics(): void {
   document.head.appendChild(script);
 
   (window as any).dataLayer = (window as any).dataLayer || [];
-  function gtag(...args: any[]) {
-    (window as any).dataLayer.push(args);
+  // gtag.js solo procesa objetos `arguments`; empujar un array hace que GA4 ignore los eventos.
+  function gtag(..._args: unknown[]) {
+    (window as any).dataLayer.push(arguments);
   }
   gtag('js', new Date());
   gtag('config', GA_ID);

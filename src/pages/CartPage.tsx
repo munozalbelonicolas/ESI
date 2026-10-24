@@ -28,7 +28,7 @@ export default function CartPage() {
           <div className="cart-page__items">
             {items.map(({ product, quantity }) => (
               <div key={product.id} className="cart-item">
-                <img src={product.images[0] || '/placeholder-product.png'} alt={product.name} className="cart-item__image" />
+                <img src={product.images[0] || '/placeholder-product.svg'} alt={product.name} className="cart-item__image" />
                 <div className="cart-item__info">
                   <Link to={`/tienda/${product.slug}`} className="cart-item__name">{product.name}</Link>
                   <span className="cart-item__category">{product.category}</span>

@@ -128,8 +128,9 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 export async function getShippingQuotes(
   zipCode: string,
   totalWeight: number = 500,
-  customOverridePrice?: number | null
+  product?: { id: string; customShippingPrice?: number | null }
 ): Promise<ShippingQuote[]> {
+  const customOverridePrice = product?.customShippingPrice;
   if (!isValidShippingZipCode(zipCode)) {
     throw new Error('Código postal argentino inválido (debe tener 4 dígitos)');
   }
@@ -139,10 +140,11 @@ export async function getShippingQuotes(
     const res = await fetch(`${API_BASE}/api/quote-shipping`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      // El servidor lee el envío personalizado del producto; no se le manda un precio.
       body: JSON.stringify({
         zipCode,
         weightGrams: totalWeight,
-        customOverridePrice,
+        ...(product ? { productId: product.id } : {}),
       }),
     });
     if (res.ok) {

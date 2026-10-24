@@ -9,6 +9,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getAdminDb, requireUser } from './_admin.js';
 import { freeProductDownload } from './_freeProductDownload.js';
+import { isValidDocId, readBody } from './_cors.js';
 
 function allowedOrigins(): string[] {
   const site = (process.env.VITE_SITE_URL || '').replace(/\/$/, '');
@@ -41,12 +42,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(401).json({ error: 'Iniciá sesión para acceder a tus descargas' });
     }
 
-    const orderId =
-      req.method === 'POST' ? req.body?.orderId : req.query?.orderId;
-    const productId =
-      req.method === 'POST' ? req.body?.productId : req.query?.productId;
+    const body = readBody(req);
+    const orderId = req.method === 'POST' ? body.orderId : req.query?.orderId;
+    const productId = req.method === 'POST' ? body.productId : req.query?.productId;
 
-    if (!orderId || !productId || typeof orderId !== 'string' || typeof productId !== 'string') {
+    if (!isValidDocId(orderId) || !isValidDocId(productId)) {
       return res.status(400).json({ error: 'orderId y productId requeridos' });
     }
 
@@ -94,6 +94,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!downloadUrl) {
       return res.status(404).json({ error: 'Archivo digital no encontrado para este producto' });
     }
+
+    // Registro de entregas: los enlaces de Drive son permanentes, así que al menos queda trazado
+    // qué compra recibió cada enlace por si aparece compartido.
+    await db.collection('downloadEvents').add({
+      userId: user.uid,
+      orderId,
+      productId,
+      byAdmin: order.userId !== user.uid,
+      createdAt: new Date(),
+    }).catch((err) => console.error('[DownloadProduct] No se pudo registrar la descarga:', err?.message || err));
 
     return res.status(200).json({
       downloadUrl,

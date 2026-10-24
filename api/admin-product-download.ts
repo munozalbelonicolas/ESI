@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminDb, requireUser } from './_admin.js';
-import { handleApiCors } from './_cors.js';
+import { handleApiCors, isValidDocId, readBody } from './_cors.js';
 import { migrateProductDownloads } from './_migrateProductDownloads.js';
 
 function validHttpsUrl(value: unknown): string | null {
@@ -26,8 +26,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const user = await requireUser(req);
     if (!user?.isAdmin) return res.status(403).json({ error: 'Acceso restringido a administradores' });
 
-    const productId = req.method === 'GET' ? req.query?.productId : req.body?.productId;
-    if (typeof productId !== 'string' || !productId.trim()) {
+    const productId = req.method === 'GET' ? req.query?.productId : readBody(req).productId;
+    if (!isValidDocId(productId)) {
       return res.status(400).json({ error: 'productId requerido' });
     }
 
@@ -55,7 +55,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ success: true });
     }
 
-    const downloadUrl = validHttpsUrl(req.body?.downloadUrl);
+    const downloadUrl = validHttpsUrl(readBody(req).downloadUrl);
     if (!downloadUrl) return res.status(400).json({ error: 'Se requiere una URL HTTPS válida' });
 
     await productRef.update({ publicCatalogReady: false });

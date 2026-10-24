@@ -11,6 +11,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { isAuthorizedCron } from './_admin.js';
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@esi-secundaria.com.ar';
@@ -53,7 +54,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error('[StockCheck] CRON_SECRET no configurado; endpoint deshabilitado');
     return res.status(503).json({ error: 'No disponible' });
   }
-  if (req.headers.authorization !== `Bearer ${cronSecret}`) {
+  if (!isAuthorizedCron(req)) {
     return res.status(401).json({ error: 'No autorizado' });
   }
 

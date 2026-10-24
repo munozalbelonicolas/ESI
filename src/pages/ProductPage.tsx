@@ -98,7 +98,7 @@ export default function ProductPage() {
     setCalcLoading(true);
     try {
       const weight = (product.weightGrams || 500) * quantity;
-      const res = await getShippingQuotes(calcZip, weight, product.customShippingPrice);
+      const res = await getShippingQuotes(calcZip, weight, product);
       setQuotes(res);
     } catch {
       toast.error('Error al cotizar envío');

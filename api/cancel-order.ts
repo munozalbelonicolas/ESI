@@ -1,14 +1,15 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getAdminDb, requireUser } from './_admin.js';
 import { settleCouponReservation } from './_couponReservations.js';
+import { isValidDocId, readBody } from './_cors.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   try {
     const user = await requireUser(req);
     if (!user) return res.status(401).json({ error: 'No autenticado' });
-    const orderId = req.body?.orderId;
-    if (typeof orderId !== 'string' || !orderId) return res.status(400).json({ error: 'orderId requerido' });
+    const orderId = readBody(req).orderId;
+    if (!isValidDocId(orderId)) return res.status(400).json({ error: 'orderId requerido' });
 
     const db = getAdminDb();
     const orderRef = db.collection('orders').doc(orderId);

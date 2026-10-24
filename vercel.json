@@ -22,6 +22,10 @@
       "destination": "/api/admin-product-download?action=migrate"
     },
     {
+      "source": "/api/admin-update-order",
+      "destination": "/api/admin-approve-order?action=update"
+    },
+    {
       "source": "/api/validate-coupon",
       "destination": "/api/create-order?action=validate-coupon"
     },

@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminDb, requireUser } from './_admin.js';
-import { handleApiCors } from './_cors.js';
+import { handleApiCors, readBody } from './_cors.js';
 
 /** One-time admin migration: move legacy URLs out of publicly readable product documents. */
 export async function migrateProductDownloads(req: VercelRequest, res: VercelResponse) {
@@ -13,7 +13,7 @@ export async function migrateProductDownloads(req: VercelRequest, res: VercelRes
     if (!user?.isAdmin) return res.status(403).json({ error: 'Acceso restringido a administradores' });
 
     const db = getAdminDb();
-    const dryRun = req.body?.dryRun === true;
+    const dryRun = readBody(req).dryRun === true;
     const snapshot = await db.collection('products').get();
     let migrated = 0;
     let cleaned = 0;

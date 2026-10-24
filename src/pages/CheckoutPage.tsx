@@ -105,13 +105,13 @@ export default function CheckoutPage() {
   const handleSubmit = async () => {
     if (!isEmailVerified) { toast.error('Verificá tu email antes de comprar. Revisá tu casilla.'); return; }
     if (!hasDigitalOnly && !selectedShipping) { toast.error('Seleccioná un método de envío'); return; }
-    if (paymentMethod === 'transfer' && !transferFile) { toast.error('Subí el comprobante de transferencia'); return; }
+    if (paymentMethod === 'transfer' && !transferFile && total > 0) { toast.error('Subí el comprobante de transferencia'); return; }
 
     setProcessing(true);
     trackBeginCheckout(total, items.map(i => ({ item_id: i.product.id, item_name: i.product.name, price: i.product.price, quantity: i.quantity })), appliedCoupon?.code);
 
     try {
-      const orderId = await createOrder({
+      const { orderId, paymentStatus: createdPaymentStatus } = await createOrder({
         userId: firebaseUser.uid,
         userEmail: firebaseUser.email || '',
         userName: profile?.displayName || '',
@@ -124,6 +124,17 @@ export default function CheckoutPage() {
         shippingAddress: hasDigitalOnly ? null : address,
         total, paymentMethod,
       });
+
+      const purchasedItems = items.map(i => ({ item_id: i.product.id, item_name: i.product.name, price: i.product.price, quantity: i.quantity }));
+
+      // Pedido de $0 (cupón del 100%): el servidor ya lo aprobó y envió el email con las descargas.
+      if (createdPaymentStatus === 'approved') {
+        trackPurchase(orderId, 0, purchasedItems, paymentMethod);
+        await onPurchaseComplete({ userId: firebaseUser.uid, email: firebaseUser.email || '', type: 'purchase', productIds: items.map(i => i.product.id), timestamp: new Date() });
+        clearCart();
+        navigate(`/checkout/exito?order=${orderId}`);
+        return;
+      }
 
       if (paymentMethod === 'transfer' && transferFile) {
         const proofUrl = await uploadTransferProof(transferFile, orderId);
@@ -148,7 +159,7 @@ export default function CheckoutPage() {
         }
       }
 
-      trackPurchase(orderId, total, items.map(i => ({ item_id: i.product.id, item_name: i.product.name, price: i.product.price, quantity: i.quantity })), paymentMethod);
+      trackPurchase(orderId, total, purchasedItems, paymentMethod);
       await onPurchaseComplete({ userId: firebaseUser.uid, email: firebaseUser.email || '', type: 'purchase', productIds: items.map(i => i.product.id), timestamp: new Date() });
 
       // Enviar email de aviso al cliente y admin (sin entregar descargas si no está aprobado)
@@ -393,7 +404,7 @@ export default function CheckoutPage() {
                 <div className="confirm-items">
                   {items.map(({ product, quantity }) => (
                     <div key={product.id} className="confirm-item">
-                      <img src={product.images[0] || '/placeholder-product.png'} alt={product.name} className="confirm-item__img" />
+                      <img src={product.images[0] || '/placeholder-product.svg'} alt={product.name} className="confirm-item__img" />
                       <div className="confirm-item__info">
                         <span>{product.name}</span>
                         <span className="confirm-item__qty">x{quantity}</span>

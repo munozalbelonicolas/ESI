@@ -117,6 +117,8 @@ describe('3. Mapeo y Endurecimiento de Pagos', () => {
     assert.equal(mapMpStatus('approved'), 'approved');
     assert.equal(mapMpStatus('rejected'), 'rejected');
     assert.equal(mapMpStatus('cancelled'), 'rejected');
+    assert.equal(mapMpStatus('refunded'), 'refunded');
+    assert.equal(mapMpStatus('charged_back'), 'refunded');
     assert.equal(mapMpStatus('in_process'), 'pending');
     assert.equal(mapMpStatus('pending'), 'pending');
     assert.equal(mapMpStatus(undefined), 'pending');

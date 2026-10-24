@@ -33,7 +33,7 @@ export interface CreateOrderData {
 /**
  * Crea una nueva orden.
  */
-export async function createOrder(data: CreateOrderData): Promise<string> {
+export async function createOrder(data: CreateOrderData): Promise<{ orderId: string; paymentStatus: 'pending' | 'approved' }> {
   const token = await auth.currentUser?.getIdToken();
   if (!token) throw new Error('Iniciá sesión para continuar');
   const response = await fetch(`${API_BASE}/api/create-order`, {
@@ -43,7 +43,7 @@ export async function createOrder(data: CreateOrderData): Promise<string> {
   });
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(result.error || 'No se pudo crear el pedido');
-  return result.orderId;
+  return { orderId: result.orderId, paymentStatus: result.paymentStatus === 'approved' ? 'approved' : 'pending' };
 }
 
 /**
@@ -110,33 +110,33 @@ export async function getAllOrders(): Promise<Order[]> {
 }
 
 /**
- * Actualiza el estado de una orden.
+ * Cambia el estado de un pedido (admin). Pasa por el servidor para que cancelar o rechazar
+ * libere la reserva del cupón.
  */
-export async function updateOrderStatus(
-  orderId: string,
-  status: Order['status']
-): Promise<void> {
-  await updateDoc(doc(db, COLLECTION, orderId), {
-    status,
-    updatedAt: Timestamp.now(),
+async function adminUpdateOrder(orderId: string, changes: { status?: Order['status']; paymentStatus?: Order['paymentStatus'] }): Promise<void> {
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) throw new Error('No autenticado');
+  const response = await fetch(`${API_BASE}/api/admin-update-order`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ orderId, ...changes }),
   });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || 'No se pudo actualizar el pedido');
 }
 
 /**
- * Actualiza el estado de pago y el ID de Mercado Pago.
+ * Actualiza el estado de una orden (admin).
  */
-export async function updatePaymentStatus(
-  orderId: string,
-  paymentStatus: Order['paymentStatus'],
-  mpPaymentId?: string
-): Promise<void> {
-  const updates: any = {
-    paymentStatus,
-    updatedAt: Timestamp.now(),
-  };
-  if (mpPaymentId) updates.mpPaymentId = mpPaymentId;
-  if (paymentStatus === 'approved') updates.status = 'paid';
-  await updateDoc(doc(db, COLLECTION, orderId), updates);
+export async function updateOrderStatus(orderId: string, status: Order['status']): Promise<void> {
+  await adminUpdateOrder(orderId, { status });
+}
+
+/**
+ * Actualiza el estado de pago (admin). La aprobación usa adminApproveOrder.
+ */
+export async function updatePaymentStatus(orderId: string, paymentStatus: Order['paymentStatus']): Promise<void> {
+  await adminUpdateOrder(orderId, { paymentStatus });
 }
 
 /**

@@ -3,6 +3,7 @@
  * El prefijo "_" evita que Vercel lo exponga como endpoint.
  */
 
+import { timingSafeEqual } from 'node:crypto';
 import type { VercelRequest } from '@vercel/node';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
@@ -35,7 +36,8 @@ export async function requireUser(
   if (!idToken) return null;
   try {
     ensureAdminApp();
-    const decoded = await getAuth().verifyIdToken(idToken);
+    // checkRevoked: una sesión revocada (p. ej. un admin removido) deja de valer al instante.
+    const decoded = await getAuth().verifyIdToken(idToken, true);
     const userSnap = await getAdminDb().collection('users').doc(decoded.uid).get();
     return {
       uid: decoded.uid,
@@ -55,4 +57,13 @@ export async function getVerifiedUserEmail(uid: string): Promise<string | null> 
   ensureAdminApp();
   const user = await getAuth().getUser(uid);
   return user.email && user.emailVerified ? user.email : null;
+}
+
+/** Vercel Cron envía "Authorization: Bearer $CRON_SECRET". Falla cerrado si el secreto no existe. */
+export function isAuthorizedCron(req: VercelRequest): boolean {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return false;
+  const received = Buffer.from(String(req.headers.authorization || ''));
+  const expected = Buffer.from(`Bearer ${secret}`);
+  return received.length === expected.length && timingSafeEqual(received, expected);
 }

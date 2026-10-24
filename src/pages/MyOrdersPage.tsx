@@ -177,7 +177,7 @@ export default function MyOrdersPage() {
                       </span>
                       <span
                         className={`badge badge--${
-                          o.paymentStatus === 'approved' ? 'free' : o.paymentStatus === 'rejected' ? 'out' : 'sale'
+                          o.paymentStatus === 'approved' ? 'free' : o.paymentStatus === 'rejected' || o.paymentStatus === 'refunded' ? 'out' : 'sale'
                         }`}
                       >
                         {PAYMENT_STATUS_LABELS[o.paymentStatus]}

@@ -11,7 +11,7 @@ interface ImportMetaEnv {
   readonly VITE_CLOUDINARY_CLOUD_NAME: string;
   readonly VITE_CLOUDINARY_UPLOAD_PRESET: string;
   readonly VITE_MP_PUBLIC_KEY: string;
-  readonly VITE_GA_TRACKING_ID: string;
+  readonly VITE_GA_MEASUREMENT_ID: string;
   readonly VITE_FIREBASE_FUNCTIONS_URL: string;
   readonly VITE_USE_FIREBASE_EMULATOR: string;
   readonly VITE_WHATSAPP_NUMBER: string;

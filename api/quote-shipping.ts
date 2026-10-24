@@ -6,6 +6,9 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { getAdminDb } from './_admin.js';
+import { isValidDocId, readBody } from './_cors.js';
+import { clientIp, consumeRateLimit } from './_rateLimit.js';
 import { getCanonicalShippingQuotes, isValidShippingZipCode } from './_shipping.js';
 
 function allowedOrigins(): string[] {
@@ -31,14 +34,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { zipCode, weightGrams, customOverridePrice } = req.body || {};
+    // Endpoint público (la ficha de producto cotiza sin login): se limita por IP porque cada
+    // consulta puede llamar a la API de Correo Argentino con las credenciales de la tienda.
+    if (!(await consumeRateLimit('quote-shipping', clientIp(req), 30, 10 * 60 * 1000))) {
+      return res.status(429).json({ error: 'Demasiadas cotizaciones. Esperá unos minutos.' });
+    }
+
+    const { zipCode, weightGrams, productId } = readBody(req);
 
     if (!zipCode || !isValidShippingZipCode(String(zipCode))) {
       return res.status(400).json({ error: 'Código postal inválido (debe tener 4 dígitos)' });
     }
 
-    const safeWeight = Number(weightGrams) || 500;
-    const safeOverride = typeof customOverridePrice === 'number' ? customOverridePrice : null;
+    const weight = Number(weightGrams);
+    const safeWeight = Number.isFinite(weight) && weight > 0 ? weight : 500;
+    // El precio de envío personalizado sale del producto en Firestore, nunca del navegador.
+    let safeOverride: number | null = null;
+    if (productId !== undefined) {
+      if (!isValidDocId(productId)) return res.status(400).json({ error: 'Producto inválido' });
+      const custom = Number((await getAdminDb().collection('products').doc(productId).get()).data()?.customShippingPrice);
+      safeOverride = Number.isFinite(custom) && custom > 0 ? custom : null;
+    }
 
     const quotes = await getCanonicalShippingQuotes(String(zipCode), safeWeight, safeOverride);
 

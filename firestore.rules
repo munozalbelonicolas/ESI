@@ -11,6 +11,15 @@ service cloud.firestore {
       return isAuth() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    // El comprobante solo se adjunta o corrige mientras el pedido por transferencia espera revisión.
+    function isPendingTransferOf(orderId) {
+      let order = get(/databases/$(database)/documents/orders/$(orderId)).data;
+      return order.userId == request.auth.uid
+        && order.paymentMethod == 'transfer'
+        && order.paymentStatus == 'pending'
+        && order.status == 'pending';
+    }
+
     function isOwner(userId) {
       return isAuth() && request.auth.uid == userId;
     }
@@ -54,9 +63,13 @@ service cloud.firestore {
       allow read: if isAuth() && (resource.data.userId == request.auth.uid || isAdmin());
       // Los pedidos se crean desde el servidor para reservar los cupones de forma atómica.
       allow create: if false;
-      // El dueño solo puede adjuntar el comprobante; el admin puede cambiar estados
+      // El dueño solo puede adjuntar el comprobante de un pedido por transferencia pendiente;
+      // los cambios de estado del admin pasan por /api/admin-update-order.
       allow update: if isAdmin()
         || (isAuth() && resource.data.userId == request.auth.uid
+            && resource.data.paymentMethod == 'transfer'
+            && resource.data.paymentStatus == 'pending'
+            && resource.data.status == 'pending'
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['transferProofUrl', 'updatedAt']));
       // Solo admins. El cliente cancela vía /api/cancel-order, que libera la reserva de cupón.
       allow delete: if isAdmin();
@@ -72,7 +85,7 @@ service cloud.firestore {
       );
       allow create, update: if isAuth()
         && exists(/databases/$(database)/documents/orders/$(orderId))
-        && get(/databases/$(database)/documents/orders/$(orderId)).data.userId == request.auth.uid
+        && isPendingTransferOf(orderId)
         && request.resource.data.orderId == orderId
         && request.resource.data.imageData is string
         && request.resource.data.imageData.matches('^data:image/(jpeg|png|webp);base64,.*')
