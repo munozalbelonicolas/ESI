@@ -29,9 +29,9 @@ const safeUrl = (v: unknown): string => {
 };
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@esi-secundaria.com.ar';
+const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@esiensecundaria.com.ar';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || '';
-const SITE_URL = (process.env.VITE_SITE_URL || 'https://esi-secundaria.com.ar').replace(/\/$/, '');
+const SITE_URL = (process.env.VITE_SITE_URL || 'https://esiensecundaria.com.ar').replace(/\/$/, '');
 
 export interface OrderEmailItem {
   productId?: string;

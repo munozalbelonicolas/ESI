@@ -166,7 +166,7 @@ Las funciones reales de `/api` se prueban con `vercel dev`; no uses la antigua r
 | `VITE_MP_PUBLIC_KEY`            | Public key de Mercado Pago           |
 | `VITE_GA_MEASUREMENT_ID`        | ID de GA4 (G-XXXXXXX)                |
 | `VITE_WHATSAPP_NUMBER`          | Número de WhatsApp (sin +)           |
-| `VITE_SITE_URL`                 | URL del sitio (ej: https://esi-secundaria.com) |
+| `VITE_SITE_URL`                 | URL del sitio (ej: https://esiensecundaria.com.ar) |
 | `VITE_API_BASE_URL`             | Vacío si se sirve desde Vercel       |
 
 ### Servidor (Vercel Dashboard > Settings > Environment Variables) — secretas
@@ -176,7 +176,7 @@ Las funciones reales de `/api` se prueban con `vercel dev`; no uses la antigua r
 | `MP_ACCESS_TOKEN`            | Access Token de Mercado Pago (server-side)     |
 | `MP_WEBHOOK_SECRET`           | Secreto de firma de notificaciones de Mercado Pago (obligatorio) |
 | `RESEND_API_KEY`             | API Key de Resend para emails                  |
-| `FROM_EMAIL`                 | Email remitente (ej: noreply@esi-secundaria.com) |
+| `FROM_EMAIL`                 | Email remitente (ej: noreply@esiensecundaria.com.ar) |
 | `ADMIN_EMAIL`                | Email del admin para notificaciones            |
 | `FIREBASE_PROJECT_ID`        | Project ID de Firebase                         |
 | `FIREBASE_CLIENT_EMAIL`      | Email del service account                      |

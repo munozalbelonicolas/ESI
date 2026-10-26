@@ -14,7 +14,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { isAuthorizedCron } from './_admin.js';
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@esi-secundaria.com.ar';
+const FROM_EMAIL = process.env.FROM_EMAIL || 'noreply@esiensecundaria.com.ar';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || '';
 const LOW_STOCK_THRESHOLD = Number(process.env.LOW_STOCK_THRESHOLD || 5);
 
